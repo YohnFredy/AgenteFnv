@@ -15,6 +15,15 @@
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Dashboard') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="cpu-chip" :href="route('bot.settings')" :current="request()->routeIs('bot.settings')" wire:navigate>
+                        {{ __('Configuración Bot') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="chat-bubble-left-right" :href="route('bot.rules')" :current="request()->routeIs('bot.rules')" wire:navigate>
+                        {{ __('Reglas de Respuesta') }}
+                    </flux:sidebar.item>
+                     <flux:sidebar.item icon="user-group" :href="route('chat.list')" :current="request()->routeIs('chat.list')" wire:navigate>
+                        {{ __('Monitor de Chats') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
