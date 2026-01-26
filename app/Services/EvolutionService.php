@@ -29,10 +29,13 @@ class EvolutionService
             $response = Http::withHeaders([
                 'apikey' => $apiKey,
                 'Content-Type' => 'application/json',
-            ])->post($url, [
-                "number" => $remoteJid, // El ID de usuario (ej: 57300...@s.whatsapp.net)
-                "text" => $text
-            ]);
+            ])
+                ->timeout(30)
+                ->retry(2, 1000)
+                ->post($url, [
+                    "number" => $remoteJid,
+                    "text" => $text
+                ]);
 
             if ($response->failed()) {
                 Log::error('Error enviando a Evolution: ' . $response->body());
@@ -40,7 +43,6 @@ class EvolutionService
             }
 
             return true;
-
         } catch (\Exception $e) {
             Log::error('Excepción Evolution: ' . $e->getMessage());
             return false;
@@ -66,17 +68,67 @@ class EvolutionService
             $response = Http::withHeaders([
                 'apikey' => $apiKey,
                 'Content-Type' => 'application/json',
-            ])->post($url, [
-                "number" => $remoteJid,
-                "presence" => $status,
-                "delay" => 1200 // Milisegundos que dura el estado (opcional)
-            ]);
+            ])
+                ->timeout(10)
+                ->post($url, [
+                    "number" => $remoteJid,
+                    "presence" => $status,
+                    "delay" => 1200
+                ]);
 
             return $response->successful();
-
         } catch (\Exception $e) {
             Log::error('Excepción Presence Evolution: ' . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Obtiene el base64 de un archivo multimedia (audio, imagen, etc.) ya desencriptado.
+     * WhatsApp encripta los archivos, Evolution API los desencripta.
+     *
+     * @param string $messageId ID del mensaje de WhatsApp
+     * @param string $remoteJid JID del chat
+     * @return string|null Base64 del archivo o null si falla
+     */
+    public function getMediaBase64(string $messageId, string $remoteJid): ?string
+    {
+        $baseUrl = env('EVOLUTION_API_URL');
+        $apiKey = env('EVOLUTION_API_KEY');
+        $instance = env('EVOLUTION_INSTANCE');
+
+        // Endpoint para obtener media de Evolution API v2
+        $url = "{$baseUrl}/chat/getBase64FromMediaMessage/{$instance}";
+
+        try {
+            /** @var \Illuminate\Http\Client\Response $response */
+            $response = Http::withHeaders([
+                'apikey' => $apiKey,
+                'Content-Type' => 'application/json',
+            ])
+                ->timeout(45)
+                ->retry(2, 1000)
+                ->post($url, [
+                    "message" => [
+                        "key" => [
+                            "id" => $messageId,
+                            "remoteJid" => $remoteJid
+                        ]
+                    ],
+                    "convertToMp4" => false
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                // Evolution devuelve el base64 en la propiedad 'base64'
+                return $data['base64'] ?? null;
+            }
+
+            Log::error('Error obteniendo media de Evolution: ' . $response->body());
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Excepción getMediaBase64: ' . $e->getMessage());
+            return null;
         }
     }
 }
