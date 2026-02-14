@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
+    'ycloud' => [
+        'api_key' => env('YCLOUD_API_KEY'),
+        'from_number' => env('YCLOUD_FROM_NUMBER'),
+        'webhook_token' => env('YCLOUD_WEBHOOK_TOKEN'),
+        'webhook_secret' => env('YCLOUD_WEBHOOK_SECRET'), // El "Secret" del panel de YCloud (whsec_xxx)
+    ],
+
+    'admin_whatsapp_number' => env('ADMIN_WHATSAPP_NUMBER'),
+
 ];

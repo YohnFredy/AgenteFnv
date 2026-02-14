@@ -3,8 +3,8 @@
 namespace App\Jobs;
 
 
-use App\Services\EvolutionService;
 use App\Services\GeminiService;
+use App\Services\YCloudService;
 use App\Models\Chat;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use App\Models\Message;
@@ -13,6 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 
 class ProcessWhatsappMessage implements ShouldQueue
@@ -55,9 +56,9 @@ class ProcessWhatsappMessage implements ShouldQueue
         $this->triggeringMessageId = $triggeringMessageId;
     }
 
-    public function handle(GeminiService $geminiService, EvolutionService $evolutionService)
+    public function handle(GeminiService $geminiService, YCloudService $ycloudService)
     {
-        Log::info("Job iniciado para el chat: " . $this->chat->remote_jid . " (Trigger ID: {$this->triggeringMessageId})");
+        Log::info("[JOB START] Chat: {$this->chat->remote_jid}, Trigger ID: {$this->triggeringMessageId}, Provider: {$this->chat->provider}");
 
         // 0. VERIFICACIÓN DE BUFFERING (ID Based Debounce)
         // Buscamos si existe ALGÚN mensaje de usuario con ID mayor al que disparó este job.
@@ -68,9 +69,32 @@ class ProcessWhatsappMessage implements ShouldQueue
             ->exists();
 
         if ($newerMessageExists) {
-            Log::info("Job cancelado por Buffering: Existe un mensaje más nuevo (ID > {$this->triggeringMessageId}).");
+            Log::info("[JOB CANCELLED] Buffering: Newer message exists (ID > {$this->triggeringMessageId})");
             return;
         }
+
+        // ============================================================
+        // SISTEMA DE COMPOSING HUMANIZADO - INICIO
+        // ============================================================
+        // Simula comportamiento humano: "lee el mensaje, piensa, y empieza a escribir"
+
+        // 1. Pequeña pausa inicial (simula "lectura" del mensaje) - 1 a 2 segundos
+        $initialPause = rand(1000, 2000) / 1000; // 1.0 a 2.0 segundos
+        usleep((int)($initialPause * 1000000));
+
+        // 2. Ahora envía el primer "escribiendo..."
+        $ycloudService->sendPresence($this->chat->remote_jid, 'composing');
+        $lastComposingTime = microtime(true);
+
+        // Helper closure para refrescar composing si pasaron más de 4 segundos
+        $refreshComposing = function () use ($ycloudService, &$lastComposingTime) {
+            $elapsed = microtime(true) - $lastComposingTime;
+            if ($elapsed >= 4.0) {
+                $ycloudService->sendPresence($this->chat->remote_jid, 'composing');
+                $lastComposingTime = microtime(true);
+                Log::debug("Composing refreshed para {$this->chat->remote_jid}");
+            }
+        };
 
         // 0.a [MODIFICADO] PROCESAR AUDIO SI ES NECESARIO
         // Usamos Evolution API para obtener el audio desencriptado (WhatsApp envía URLs encriptadas)
@@ -80,8 +104,8 @@ class ProcessWhatsappMessage implements ShouldQueue
         if ($triggerMessage && $triggerMessage->media_type === 'audio' && $triggerMessage->whatsapp_id && $triggerMessage->content === '[Audio Message]') {
             Log::info("Transcribiendo audio para mensaje ID: {$this->triggeringMessageId}");
 
-            // Obtener el base64 del audio desencriptado desde Evolution API
-            $base64Audio = $evolutionService->getMediaBase64($triggerMessage->whatsapp_id, $this->chat->remote_jid);
+            // Obtener el base64 del audio desde YCloud
+            $base64Audio = $this->downloadYCloudMedia($triggerMessage->media_url);
 
             if ($base64Audio) {
                 // Guardar el audio localmente para reproducción posterior
@@ -89,6 +113,9 @@ class ProcessWhatsappMessage implements ShouldQueue
 
                 $transcription = $geminiService->transcribeAudio($base64Audio);
                 Log::info("Transcripción completada: " . $transcription);
+
+                // Refresh composing después de transcripción (operación larga)
+                $refreshComposing();
 
                 // Actualizamos el mensaje en DB con la transcripción y la ruta del audio
                 $triggerMessage->update([
@@ -99,7 +126,7 @@ class ProcessWhatsappMessage implements ShouldQueue
                 // Actualizamos también la variable local para que el resto del job use el texto
                 $this->userMessageText = $transcription;
             } else {
-                Log::error("No se pudo obtener el audio de Evolution para mensaje ID: {$this->triggeringMessageId}");
+                Log::error("No se pudo obtener el audio para mensaje ID: {$this->triggeringMessageId}");
                 $triggerMessage->update(['content' => '(Error al obtener audio)']);
                 $this->userMessageText = '(Error al obtener audio)';
             }
@@ -115,7 +142,7 @@ class ProcessWhatsappMessage implements ShouldQueue
 
         foreach ($pendingAudios as $audioMsg) {
             Log::info("Transcribiendo audio pendiente ID: {$audioMsg->id}");
-            $base64 = $evolutionService->getMediaBase64($audioMsg->whatsapp_id, $this->chat->remote_jid);
+            $base64 = $this->downloadYCloudMedia($audioMsg->media_url);
             if ($base64) {
                 // Guardar el audio localmente
                 $audioPath = $this->saveAudioFile($base64, $audioMsg->id);
@@ -125,6 +152,9 @@ class ProcessWhatsappMessage implements ShouldQueue
                     'content' => $text,
                     'media_path' => $audioPath
                 ]);
+
+                // Refresh composing después de cada transcripción
+                $refreshComposing();
             } else {
                 $audioMsg->update(['content' => '(Error al obtener audio)']);
             }
@@ -137,8 +167,11 @@ class ProcessWhatsappMessage implements ShouldQueue
         if ($triggerMessage && $triggerMessage->media_type === 'image' && $triggerMessage->whatsapp_id) {
             Log::info("Procesando imagen para mensaje ID: {$this->triggeringMessageId}");
 
-            // Obtener el base64 de la imagen desde Evolution API
-            $base64Image = $evolutionService->getMediaBase64($triggerMessage->whatsapp_id, $this->chat->remote_jid);
+            // Obtener el base64 de la imagen desde YCloud
+            $base64Image = $this->downloadYCloudMedia($triggerMessage->media_url);
+            if ($base64Image) {
+                Log::info("Imagen descargada de YCloud.");
+            }
 
             if ($base64Image) {
                 // Guardar la imagen localmente para visualización posterior
@@ -150,9 +183,12 @@ class ProcessWhatsappMessage implements ShouldQueue
                 // Guardar el base64 para usarlo en la consulta de visión a Gemini
                 $imageBase64ForVision = $base64Image;
 
+                // Refresh composing después de procesar imagen
+                $refreshComposing();
+
                 Log::info("Imagen guardada: {$imagePath}");
             } else {
-                Log::error("No se pudo obtener la imagen de Evolution para mensaje ID: {$this->triggeringMessageId}");
+                Log::error("No se pudo obtener la imagen para mensaje ID: {$this->triggeringMessageId}");
             }
         }
 
@@ -166,7 +202,7 @@ class ProcessWhatsappMessage implements ShouldQueue
 
         foreach ($pendingImages as $imgMsg) {
             Log::info("Procesando imagen pendiente ID: {$imgMsg->id}");
-            $base64Img = $evolutionService->getMediaBase64($imgMsg->whatsapp_id, $this->chat->remote_jid);
+            $base64Img = $this->downloadYCloudMedia($imgMsg->media_url);
             if ($base64Img) {
                 $imgPath = $this->saveImageFile($base64Img, $imgMsg->id);
                 $imgMsg->update(['media_path' => $imgPath]);
@@ -179,9 +215,8 @@ class ProcessWhatsappMessage implements ShouldQueue
             }
         }
 
-        // 0c. REFRESCAR "ESCRIBIENDO..."
-        // Como pasaron 10s, el estado original pudo haber expirado. Lo enviamos de nuevo.
-        $evolutionService->sendPresence($this->chat->remote_jid, 'composing');
+        // 0c. REFRESCAR "ESCRIBIENDO..." antes de continuar con IA
+        $refreshComposing();
 
         try {
             // c. VERIFICACIÓN DE REGLAS DE RESPUESTA (Stage Filtering)
@@ -212,14 +247,45 @@ class ProcessWhatsappMessage implements ShouldQueue
             $fullUserMessage = $recentUserMessages
                 ->pluck('content')
                 ->filter(function ($content) {
-                    return !in_array($content, ['[Image Message]', '[Audio Message]']);
+                    return !in_array($content, ['[Image Message]', '[Audio Message]', '[Unsupported Message]', '[Empty Text Message]']);
                 })
                 ->implode(' ');
 
-            // Si está vacío (no debería), usamos el texto del trigger (excepto si es placeholder)
+            // Si está vacío, usamos el texto del trigger
             if (empty(trim($fullUserMessage))) {
                 $fallback = $this->userMessageText;
-                if (!in_array($fallback, ['[Image Message]', '[Audio Message]'])) {
+
+                // CASO ESPECIAL: Archivo no soportado y sin texto adicional
+                // IMPORTANTE: Solo enviamos mensaje de cortesía si realmente es un archivo no soportado
+                // NO lo enviamos si es un mensaje de texto normal (evita falsos positivos)
+                if ($fallback === '[Unsupported Message]') {
+                    // Verificar que el tipo de media sea realmente uno no soportado (video, document, sticker, etc.)
+                    // y no un mensaje de texto mal clasificado
+                    $triggerMediaType = $triggerMessage ? $triggerMessage->media_type : null;
+
+                    // Solo enviamos mensaje de cortesía si hay un tipo de medio específico que no soportamos
+                    if ($triggerMediaType && !in_array($triggerMediaType, ['text', 'image', 'audio', null])) {
+                        Log::info("Mensaje no soportado detectado (tipo: {$triggerMediaType}) sin contexto adicional. Enviando respuesta de cortesía.");
+
+                        $politeMessage = "👋 Hola. He recibido tu archivo, pero por el momento mi sistema solo está optimizado para analizar **Texto, Audios e Imágenes**.\n\n¿Podrías por favor escribirme tu consulta o enviármela en una nota de voz? Estaré encantado de ayudarte. 😊";
+
+                        $ycloudService->sendMessage($this->chat->remote_jid, $politeMessage);
+
+                        Message::create([
+                            'chat_id' => $this->chat->id,
+                            'role' => 'assistant',
+                            'content' => $politeMessage,
+                        ]);
+
+                        return; // Detener Job
+                    } else {
+                        Log::warning("Mensaje marcado como [Unsupported Message] pero sin media_type válido. Posible falso positivo. Procesando con IA.");
+                        // Continuamos el procesamiento normal con IA
+                        $fullUserMessage = ''; // Dejamos vacío para que la IA procese el historial
+                    }
+                }
+
+                if (!in_array($fallback, ['[Image Message]', '[Audio Message]', '[Unsupported Message]', '[Empty Text Message]'])) {
                     $fullUserMessage = $fallback;
                 }
             }
@@ -227,9 +293,13 @@ class ProcessWhatsappMessage implements ShouldQueue
             Log::info("Evaluando reglas para mensaje combinado: '{$fullUserMessage}' (Trigger ID: {$this->triggeringMessageId})");
 
 
+            Log::info("Chat ID: {$this->chat->id}, Remote JID: {$this->chat->remote_jid}, Current Stage: {$this->chat->stage}");
+
             $rules = \App\Models\BotRule::where('trigger_stage', $this->chat->stage)
                 ->where('is_active', true)
                 ->get();
+
+            Log::info("Found " . count($rules) . " rules for stage {$this->chat->stage}");
 
             foreach ($rules as $rule) {
                 // Normalizamos keywords y mensaje
@@ -239,6 +309,7 @@ class ProcessWhatsappMessage implements ShouldQueue
                 $match = false;
                 foreach ($keywords as $keyword) {
                     if (!empty($keyword) && str_contains($messageLower, $keyword)) {
+                        Log::info("Match found for keyword: '{$keyword}' in message: '{$messageLower}'");
                         $match = true;
                         break;
                     }
@@ -252,10 +323,17 @@ class ProcessWhatsappMessage implements ShouldQueue
                     $saludo = ($hour < 12) ? 'Buenos días' : (($hour < 18) ? 'Buenas tardes' : 'Buenas noches');
 
                     foreach ($rule->messages as $msg) {
+                        // Reemplazar {saludo} y limpiar espacios/puntos dobles si el saludo está vacío
                         $finalContent = str_replace('{saludo}', $saludo, $msg->content);
 
+                        // Si el saludo está vacío, eliminamos posibles inicios feos como ". " o "  "
+                        if (empty($saludo)) {
+                            $finalContent = ltrim($finalContent, "., ");
+                            $finalContent = ucfirst($finalContent); // Asegurar que empiece en mayúscula
+                        }
+
                         // Enviar a WhatsApp
-                        $evolutionService->sendMessage($this->chat->remote_jid, $finalContent);
+                        $ycloudService->sendMessage($this->chat->remote_jid, $finalContent);
 
                         // Guardar en DB como asistente
                         Message::create([
@@ -281,13 +359,32 @@ class ProcessWhatsappMessage implements ShouldQueue
             // 1. Preparar el contexto (Memoria + Instrucción Global)
             $history = $this->chat->getHistoryForAi(50);
 
+            // [MODIFICADO] Saludo dinámico según la hora (Solo una vez al día)
+            $hasGreetedToday = Message::where('chat_id', $this->chat->id)
+                ->where('role', 'assistant')
+                ->whereDate('created_at', now()->toDateString())
+                ->exists();
+
+            $hour = now()->hour;
+            $greetingText = ($hour < 12) ? 'Buenos días' : (($hour < 18) ? 'Buenas tardes' : 'Buenas noches');
+
+            // Si ya saludó hoy, dejamos el saludo vacío para no ser repetitivo
+            $saludo = $hasGreetedToday ? '' : $greetingText;
+
             // Obtener instrucción global
             $globalSetting = \App\Models\BotSetting::find('system_instruction');
             $baseInstruction = $globalSetting ? $globalSetting->value : 'Eres un asistente útil y amable.';
 
+            // [MODIFICADO] Construir instrucción con saludo
+            if (!$hasGreetedToday) {
+                $systemInstruction = "Instrucción de Cortesía: Es la primera vez que hablas con el usuario hoy. Puedes saludarlo diciendo \"{$saludo}\" al inicio de tu mensaje SI el usuario te saludó o si es apropiado para iniciar la respuesta. Si el usuario hace una pregunta directa de qué trata el negocio, responde a la pregunta de forma natural sin ser excesivamente formal.\n" . $baseInstruction;
+            } else {
+                $systemInstruction = "Instrucción de Cortesía: Ya has saludado al usuario hoy. NO repitas saludos formales como 'Buenos días' o 'Buenas tardes'; ve directo al grano.\n" . $baseInstruction;
+            }
+
             // [MODIFICADO] Instrucción Handoff
-            $handoffInstruction = "\nIMPORTANTE: Si el usuario solicita explícitamente hablar con una persona/humano, o expresa frustración grave y pide ayuda real, DEBES responder ÚNICAMENTE con la etiqueta: [TRANSFER_TO_HUMAN]. No contestes nada más si usas esa etiqueta.";
-            $systemInstruction = $baseInstruction . $handoffInstruction;
+            $handoffInstruction = "\nIMPORTANTE: Si necesitas escalar a un humano (porque el usuario lo pide, hay frustración grave, o aplica alguna regla de escalamiento como registro de negocios), DEBES incluir la etiqueta [TRANSFER_TO_HUMAN] al FINAL de tu respuesta. Puedes escribir un mensaje antes de la etiqueta. La etiqueta DEBE aparecer textualmente en tu respuesta para que el sistema funcione. Ejemplo: 'Te voy a comunicar con un asesor. [TRANSFER_TO_HUMAN]'";
+            $systemInstruction .= $handoffInstruction;
 
             // 2. Consultar a Gemini (con o sin imagen)
             if ($imageBase64ForVision) {
@@ -336,18 +433,58 @@ class ProcessWhatsappMessage implements ShouldQueue
                 $aiResponse = $geminiService->askGemini($fullPrompt);
             }
 
-            // [MODIFICADO] Verificar Handoff
+            // Refresh composing después de recibir respuesta de IA
+            $refreshComposing();
+
+            // [MODIFICADO] Verificar Handoff - Detección dual (tag + palabras clave)
+            Log::info("AI Response para handoff check: " . substr($aiResponse, 0, 200));
+
+            $handoffDetected = false;
+
+            // Método 1: Tag literal [TRANSFER_TO_HUMAN]
             if (str_contains($aiResponse, '[TRANSFER_TO_HUMAN]')) {
-                Log::info("Intención de Humano detectada. Iniciando Handoff para chat: " . $this->chat->remote_jid);
+                $handoffDetected = true;
+                Log::info("Handoff detectado por TAG [TRANSFER_TO_HUMAN]");
+            }
+
+            // Método 2: Fallback por palabras clave (si la IA no incluyó el tag)
+            if (!$handoffDetected) {
+                $aiResponseLower = mb_strtolower($aiResponse);
+                $handoffKeywords = [
+                    'comunicar con un asesor',
+                    'comunicarte con un asesor',
+                    'conectar con un asesor',
+                    'asesor especializado',
+                    'asesor humano',
+                    'hablar con un asesor',
+                    'poner en contacto con un asesor',
+                    'comunicar con uno de nuestros asesores',
+                    'transferir con un asesor',
+                    'derivar a un asesor',
+                ];
+                foreach ($handoffKeywords as $keyword) {
+                    if (str_contains($aiResponseLower, $keyword)) {
+                        $handoffDetected = true;
+                        Log::info("Handoff detectado por KEYWORD: '{$keyword}'");
+                        break;
+                    }
+                }
+            }
+
+            if ($handoffDetected) {
+                Log::info("Iniciando Handoff para chat: " . $this->chat->remote_jid);
 
                 // a. Desactivar el bot
                 $this->chat->update(['is_active' => false]);
 
-                // b. Mensaje de Despedida/Transferencia
-                $handoffMessage = "Entendido. Voy a avisar a un asesor humano para que se ponga en contacto contigo en breve.";
+                // b. Mensaje de Despedida/Transferencia - Usar la respuesta de la IA sin la etiqueta
+                $handoffMessage = trim(str_replace('[TRANSFER_TO_HUMAN]', '', $aiResponse));
+                if (empty($handoffMessage)) {
+                    $handoffMessage = "Entendido. Voy a comunicarte con un asesor para que te ayude. 😊";
+                }
 
                 // c. Enviar a WP
-                $evolutionService->sendMessage($this->chat->remote_jid, $handoffMessage);
+                $ycloudService->sendMessage($this->chat->remote_jid, $handoffMessage);
 
                 // d. Guardar en DB como asistente
                 Message::create([
@@ -356,18 +493,21 @@ class ProcessWhatsappMessage implements ShouldQueue
                     'content' => $handoffMessage,
                 ]);
 
-                // [NUEVO] Notificar al Administrador
-                $adminNumber = env('ADMIN_WHATSAPP_NUMBER');
+                // e. Notificar al Administrador (por YCloud)
+                $adminNumber = config('services.admin_whatsapp_number');
                 if ($adminNumber) {
-                    $adminMsg = "🔔 *ATENCIÓN - SOLICITUD DE HUMANO*\n\n" .
-                        "El cliente *{$this->chat->name}* ({$this->chat->remote_jid}) ha solicitado hablar con un asesor.\n" .
+                    $adminMsg = "🔔 *ATENCIÓN - SOLICITUD DE ASESOR*\n\n" .
+                        "El cliente *{$this->chat->name}* ({$this->chat->remote_jid}) necesita hablar con un asesor.\n" .
+                        "Último mensaje del usuario: \"{$this->userMessageText}\"\n" .
                         "Link al Chat: " . route('chat.detail', $this->chat->id);
 
-                    $evolutionService->sendMessage($adminNumber . '@s.whatsapp.net', $adminMsg);
-                    Log::info("Notificación de Handoff enviada al administrador: {$adminNumber}");
+                    $ycloudService->sendMessage($adminNumber, $adminMsg);
+                    Log::info("Notificación de Handoff enviada al administrador vía YCloud: {$adminNumber}");
+                } else {
+                    Log::warning("ADMIN_WHATSAPP_NUMBER no está configurado en .env");
                 }
 
-                // e. Salir
+                // f. Salir
                 return;
             }
 
@@ -380,16 +520,66 @@ class ProcessWhatsappMessage implements ShouldQueue
             ]);
 
             // 4. Enviar mensaje a WhatsApp
-            $sent = $evolutionService->sendMessage($this->chat->remote_jid, $aiResponse);
+            Log::info("[ATTEMPTING SEND] to {$this->chat->remote_jid}, Message length: " . strlen($aiResponse));
+            $ycloudService->sendPresence($this->chat->remote_jid, 'composing');
+            $sent = $ycloudService->sendMessage($this->chat->remote_jid, $aiResponse);
+            Log::info("[SEND RESULT] " . ($sent ? 'SUCCESS' : 'FAILED') . " for {$this->chat->remote_jid}");
 
             if ($sent) {
-                Log::info("Job completado: Respuesta enviada a {$this->chat->remote_jid}");
+                Log::info("[JOB SUCCESS] Response sent to {$this->chat->remote_jid}");
             } else {
-                Log::error("Job falló: No se pudo enviar mensaje a Evolution API. Chat: {$this->chat->remote_jid}");
+                Log::error("[JOB FAILED] Could not send message to {$this->chat->remote_jid}");
             }
         } catch (\Exception $e) {
             Log::error("Error crítico en ProcessWhatsappMessage: " . $e->getMessage());
             // Opcional: $this->release(10); // Reintentar en 10 segundos si falla
+        }
+    }
+
+    /**
+     * Descarga un medio (audio/imagen) desde YCloud y retorna su contenido en base64.
+     * Soporta tanto URLs directas como IDs de media de YCloud.
+     *
+     * @param string|null $urlOrId URL directa o ID del media en YCloud
+     * @return string|null Base64 del contenido, o null si falla
+     */
+    protected function downloadYCloudMedia(?string $urlOrId): ?string
+    {
+        if (empty($urlOrId)) {
+            return null;
+        }
+
+        try {
+            // Si es una URL directa, descargamos directamente
+            if (filter_var($urlOrId, FILTER_VALIDATE_URL)) {
+                $response = Http::timeout(30)->get($urlOrId);
+                if ($response->successful()) {
+                    Log::info("Media descargado de YCloud (URL directa).");
+                    return base64_encode($response->body());
+                }
+                Log::error("Fallo al descargar media YCloud: " . $response->status());
+                return null;
+            }
+
+            // Si es un ID, consultamos la API de YCloud para obtener la URL
+            $apiKey = config('services.ycloud.api_key');
+            $response = Http::timeout(30)
+                ->withHeaders(['X-API-Key' => $apiKey])
+                ->get("https://api.ycloud.com/v2/whatsapp/media/{$urlOrId}");
+
+            if ($response->successful()) {
+                $downloadUrl = $response->json('url');
+                if ($downloadUrl) {
+                    $fileContent = Http::timeout(30)->get($downloadUrl)->body();
+                    return base64_encode($fileContent);
+                }
+            }
+
+            Log::error("Fallo al obtener media por ID YCloud: {$urlOrId}");
+            return null;
+        } catch (\Exception $e) {
+            Log::error("Error descargando media YCloud: " . $e->getMessage());
+            return null;
         }
     }
 
@@ -469,16 +659,16 @@ class ProcessWhatsappMessage implements ShouldQueue
                 'content' => '⚠️ Lo siento, tuve un problema técnico procesando tu mensaje. Un asesor revisará tu caso pronto.',
             ]);
 
-            // Notificar al administrador
-            $adminNumber = env('ADMIN_WHATSAPP_NUMBER');
+            // Notificar al administrador (por YCloud)
+            $adminNumber = config('services.admin_whatsapp_number');
             if ($adminNumber) {
-                $evolutionService = app(EvolutionService::class);
+                $ycloudService = app(YCloudService::class);
                 $adminMsg = "🚨 *ERROR EN JOB DE WHATSAPP*\n\n" .
                     "Chat: *{$this->chat->name}* ({$this->chat->remote_jid})\n" .
                     "Error: {$exception->getMessage()}\n" .
                     "Link: " . route('chat.detail', $this->chat->id);
 
-                $evolutionService->sendMessage($adminNumber . '@s.whatsapp.net', $adminMsg);
+                $ycloudService->sendMessage($adminNumber, $adminMsg);
             }
         } catch (\Exception $e) {
             Log::error("Error en método failed(): " . $e->getMessage());

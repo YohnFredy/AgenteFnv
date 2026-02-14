@@ -16,8 +16,8 @@ class GeminiService
      */
     public function askGemini(string $prompt, array $history = []): string
     {
-        $apiKey = env('GEMINI_API_KEY');
-        $model = env('GEMINI_MODEL', 'gemini-2.5-flash-lite');
+        $apiKey = config('services.gemini.api_key');
+        $model = config('services.gemini.model', 'gemini-2.0-flash');
 
         // URL dinámica basada en el modelo
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
@@ -70,14 +70,14 @@ class GeminiService
     /**
      * Transcribe un archivo de audio usando Gemini.
      *
-     * @param string $base64Audio Audio en formato base64 (ya desencriptado por Evolution)
+     * @param string $base64Audio Audio en formato base64
      * @param string $mimeType Tipo MIME del audio (default: audio/ogg)
      * @return string Texto transcrito
      */
     public function transcribeAudio(string $base64Audio, string $mimeType = 'audio/ogg'): string
     {
-        $apiKey = env('GEMINI_API_KEY');
-        $model = env('GEMINI_MODEL', 'gemini-2.5-flash-lite');
+        $apiKey = config('services.gemini.api_key');
+        $model = config('services.gemini.model', 'gemini-2.0-flash');
 
         try {
             $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
@@ -131,8 +131,8 @@ class GeminiService
         string $systemInstruction = '',
         string $mimeType = 'image/jpeg'
     ): string {
-        $apiKey = env('GEMINI_API_KEY');
-        $model = env('GEMINI_MODEL', 'gemini-2.5-flash-lite');
+        $apiKey = config('services.gemini.api_key');
+        $model = config('services.gemini.model', 'gemini-2.0-flash');
         Log::info("GeminiService: Usando modelo: {$model}");
 
         try {

@@ -9,7 +9,7 @@ use App\Models\BotRule;
 use App\Models\BotRuleMessage;
 use App\Jobs\ProcessWhatsappMessage;
 use App\Services\GeminiService;
-use App\Services\EvolutionService;
+use App\Services\YCloudService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 
@@ -23,13 +23,14 @@ class BotRulesTest extends TestCase
         $chat = Chat::create([
             'remote_jid' => '123456789@s.whatsapp.net',
             'stage' => 'initial',
-            'is_active' => true
+            'is_active' => true,
+            'provider' => 'ycloud',
         ]);
 
         $rule = BotRule::create([
             'trigger_stage' => 'initial',
             'next_stage' => 'pricing_discussed',
-            'keywords' => 'quiero precio', // Rule requires "quiero" AND "precio" (or phrase)
+            'keywords' => 'quiero precio',
             'is_active' => true
         ]);
 
@@ -40,7 +41,6 @@ class BotRulesTest extends TestCase
         ]);
 
         // 2. Simulate User Messages split into two parts
-        // Message 1: "quiero"
         Message::create([
             'chat_id' => $chat->id,
             'role' => 'user',
@@ -48,7 +48,6 @@ class BotRulesTest extends TestCase
             'whatsapp_id' => 'msg_1'
         ]);
 
-        // Message 2: "precio" (This triggers the job)
         $msg2 = Message::create([
             'chat_id' => $chat->id,
             'role' => 'user',
@@ -58,11 +57,11 @@ class BotRulesTest extends TestCase
 
         // 3. Mock Services
         $geminiMock = Mockery::mock(GeminiService::class);
-        $geminiMock->shouldNotReceive('askGemini'); // Should NOT call AI if rule triggers
+        $geminiMock->shouldNotReceive('askGemini');
 
-        $evolutionMock = Mockery::mock(EvolutionService::class);
-        $evolutionMock->shouldReceive('sendPresence')->once();
-        $evolutionMock->shouldReceive('sendMessage')
+        $ycloudMock = Mockery::mock(YCloudService::class);
+        $ycloudMock->shouldReceive('sendPresence')->zeroOrMoreTimes();
+        $ycloudMock->shouldReceive('sendMessage')
             ->once()
             ->with($chat->remote_jid, Mockery::on(function ($content) {
                 return str_contains($content, 'El precio es $100');
@@ -71,7 +70,7 @@ class BotRulesTest extends TestCase
 
         // 4. Run Job
         $job = new ProcessWhatsappMessage($chat, $msg2->content, $msg2->id);
-        $job->handle($geminiMock, $evolutionMock);
+        $job->handle($geminiMock, $ycloudMock);
 
         // 5. Assertions
         $this->assertEquals('pricing_discussed', $chat->fresh()->stage);
@@ -79,7 +78,7 @@ class BotRulesTest extends TestCase
         $this->assertDatabaseHas('messages', [
             'chat_id' => $chat->id,
             'role' => 'assistant',
-            'content' => 'El precio es $100' // Ensure greeting replacement didn't break things if used, but here simpler.
+            'content' => 'El precio es $100'
         ]);
     }
 }

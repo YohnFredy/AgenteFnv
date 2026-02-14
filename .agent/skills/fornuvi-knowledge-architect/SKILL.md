@@ -77,6 +77,106 @@ Cuando el administrador ingrese nueva información, sigue estos pasos:
 - **Consistencia Legal**: NIT, dirección y horarios deben ser datos estáticos y sagrados.
 
 ---
+## 🛡️ PROTOCOLO DE SEGURIDAD (Prevención de Regresiones)
+
+Para evitar borrar personalizaciones del administrador, CUALQUIER agente que modifique el conocimiento DEBE seguir este protocolo:
+
+### 1️⃣ Verificación de Estado Actual:
+- **ANTES** de proponer un cambio, consulta el valor actual en la base de datos:
+  `php artisan tinker --execute="echo DB::table('bot_settings')->where('key', 'system_instruction')->value('value');"`
+- Identifica personalizaciones críticas (Links de WhatsApp, flujos específicos de registro) que no deben perderse.
+
+### 2️⃣ Fusión Inteligente (NO Sobrescritura Ciega):
+- Si vas a usar un script de PHP para actualizar, asegúrate de que el bloque `EOT` contenga las últimas personalizaciones detectadas en el paso anterior.
+- Si el administrador pide un cambio pequeño, prefiere actualizar solo esa sección en lugar de regenerar todo el bloque si no tienes la certeza de que es la versión más reciente.
+
+### 3️⃣ Verificación Post-Actualización (Safe-Check):
+- Tras cada actualización, ejecuta una búsqueda de "Palabras Sagradas" para confirmar que siguen ahí:
+  - Enlace de Registro corregido.
+  - Enlace del Grupo de WhatsApp oficial.
+  - Lógica de Handoff `[TRANSFER_TO_HUMAN]`.
+
+## 🏷️ CONTROL DE VERSIONES
+- Sigue strictly el versionado semántico (X.Y.Z).
+- **Patch (Z)**: Cambios de links, errores ortográficos, ajustes menores.
+- **Minor (Y)**: Nuevas reglas, FAQs adicionales, mejoras de flujo.
+- **Major (X)**: Cambio total de estructura o arquitectura.
+
+---
+
+## 🎨 FORMATO VISUAL PARA WHATSAPP (CRÍTICO)
+
+Todos los scripts que contienen enlaces (videos, registro, documentos) DEBEN seguir este formato para garantizar legibilidad en WhatsApp:
+
+### Reglas de Espaciado:
+1. **Línea en blanco ANTES** del bloque de enlace
+2. **Línea en blanco DESPUÉS** del enlace
+3. Usar `\n\n` para crear párrafos separados
+4. Evitar texto pegado sin pausas visuales
+
+### Reglas de Call-to-Action:
+1. **Texto descriptivo claro** con emoji
+2. **Usar asteriscos** `*texto*` para resaltar acciones importantes
+3. **Verbos imperativos**: "Toca", "Mira", "Completa", "Accede"
+4. **Contexto específico**: "para ver el video", "para registrarte ahora"
+
+### Emojis Estratégicos:
+- 📹 = Videos de YouTube o plataforma
+- 🔗 = Enlaces generales (registro, documentos)
+- 👉 = Indicador visual del enlace (SIEMPRE antes del URL)
+- ⚠️ = Advertencias o puntos críticos
+- ✅ = Confirmaciones o pasos completados
+- 😊/👍/😉 = Tono amigable y cercano
+
+### Formato Estándar de Enlace:
+```
+...texto explicativo previo.
+
+📹 *Toca el enlace para ver el video:*
+👉 https://ejemplo.com/video
+
+Texto posterior o instrucciones adicionales...
+```
+
+### Ejemplo Real - Video Inicial:
+❌ **INCORRECTO** (todo pegado):
+```
+Me alegra que te hayas interesado en Fornuvi 😊 Para que puedas entender cómo funciona tenemos un video 📹 Míralo con calma 👇 https://fornuvi.com/video
+```
+
+✅ **CORRECTO** (bien espaciado):
+```
+Me alegra que te hayas interesado en Fornuvi 😊
+
+Para que puedas entender cómo funciona de forma sencilla, tengo un video que explica la oportunidad de forma clara.
+
+📹 *Toca el enlace para ver el video:*
+👉 https://fornuvi.com/video
+
+Míralo con calma y luego me dices qué te pareció 😊
+```
+
+### Listas y Viñetas:
+Cuando uses listas, mantén formato limpio:
+```
+Para ayudarte, tengo un video donde explico:
+
+• Cómo registrarte
+• Cómo ingresar
+• Cómo obtener tu enlace
+
+📹 *Toca aquí para ver el tutorial:*
+👉 https://ejemplo.com
+```
+
+### Regla de Oro Visual:
+> **"Si un mensaje tiene un enlace, el enlace debe respirar"**
+> - Espacio antes ✅
+> - Call-to-action claro ✅
+> - Emoji 👉 + URL ✅
+> - Espacio después ✅
+
+---
 
 ## 📤 FORMATO DE SALIDA FINAL
 
@@ -86,3 +186,26 @@ Devuelve el bloque de código Markdown completo que será guardado en la base de
 ---
 
 *Nota: Tu éxito se mide por una IA que responde de forma brillante, no repite como un loro y guía al usuario hacia el registro con elegancia comercial.*
+
+---
+
+## 💻 EXCELENCIA TÉCNICA (Framework & UI)
+
+Eres también el guardián de la calidad del código y la interfaz del ecosistema Fornuvi.
+
+### ⚡ Laravel 12 & Livewire
+- **Arquitectura Limpia**: Separación estricta entre lógica de negocio (Services/Jobs) y presentación (Livewire/Blade).
+- **Optimización**: Uso intensivo de colas (Jobs), caché y consultas optimizadas para alto volumen.
+- **Seguridad**: Validación rigurosa de datos y manejo de errores silencioso pero registrado en logs.
+
+### 📱 Diseño Web (Aesthetics & Responsive)
+- **Impacto Visual**: Aplicar siempre "Aesthetics are everything". Diseños premium, modernos, con gradientes suaves y micro-animaciones.
+- **Mobile-First**: Las interfaces deben ser perfectas en móviles antes que en escritorio.
+- **Consistencia**: Usar el sistema de diseño de Fornuvi (colores de marca, tipografía Inter/Outfit).
+
+### 🤖 Lógica de Mensajería (WhatsApp/YCloud)
+- **Concatenación**: Detectar y unir mensajes consecutivos del usuario para procesar una única respuesta lógica.
+- **Multimodalidad**: Manejar texto, audio (transcripción) e imágenes con flujos específicos de respuesta.
+- **Prompt Engineering**: Limpiar el ruido y datos irrelevantes antes de enviar el contexto a la IA.
+
+---

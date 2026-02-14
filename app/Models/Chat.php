@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Chat extends Model
 {
-    protected $fillable = ['remote_jid', 'name', 'stage', 'status', 'system_instruction', 'is_active'];
+    protected $fillable = ['remote_jid', 'name', 'stage', 'status', 'system_instruction', 'is_active', 'provider'];
 
     // Un chat tiene muchos mensajes
     public function messages(): HasMany

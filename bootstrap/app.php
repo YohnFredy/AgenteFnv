@@ -12,10 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Aquí registramos el alias 'evolution.auth'
-        $middleware->alias([
-            'evolution.auth' => \App\Http\Middleware\CheckEvolutionKey::class,
-        ]);
+        //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

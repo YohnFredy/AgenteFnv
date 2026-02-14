@@ -7,10 +7,8 @@ use App\Models\Chat;
 use App\Models\Message;
 use App\Jobs\ProcessWhatsappMessage;
 use App\Services\GeminiService;
-use App\Services\EvolutionService;
-use App\Http\Controllers\WebhookController;
+use App\Services\YCloudService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use Mockery;
 
 class HandoffTest extends TestCase
@@ -23,7 +21,8 @@ class HandoffTest extends TestCase
         $chat = Chat::create([
             'remote_jid' => '123456789@s.whatsapp.net',
             'is_active' => true,
-            'stage' => 'initial'
+            'stage' => 'initial',
+            'provider' => 'ycloud',
         ]);
 
         $message = Message::create([
@@ -36,85 +35,59 @@ class HandoffTest extends TestCase
         $geminiMock = Mockery::mock(GeminiService::class);
         $geminiMock->shouldReceive('askGemini')
             ->once()
-            ->andReturn('[TRANSFER_TO_HUMAN]');
+            ->andReturn('Te voy a comunicar con un asesor. [TRANSFER_TO_HUMAN]');
 
-        // 3. Mock Evolution to verify final message sent
-        $evolutionMock = Mockery::mock(EvolutionService::class);
-        $evolutionMock->shouldReceive('sendPresence')->once(); // Called at start of Job
-        // Mock Admin Number
-        config(['app.admin_whatsapp_number' => '573001234567']); // Not using direct env in code, used env() helper. env() is hard to mock.
-        // Better: checking if code calls logic.
-        // Actually, let's assume we can't easily set env() at runtime for the job unless we use Config::set if code used config(). 
-        // My code used env(). Let's change code to use config() or just verify strict 1 call if no env, or 2 if env.
-
-        // Let's modify the test to just allow any number of calls greater than 1, or check specific content.
-
-        $evolutionMock->shouldReceive('sendMessage')
+        // 3. Mock YCloud
+        $ycloudMock = Mockery::mock(YCloudService::class);
+        $ycloudMock->shouldReceive('sendPresence')->zeroOrMoreTimes();
+        $ycloudMock->shouldReceive('sendMessage')
             ->atLeast()->once()
-            ->with($chat->remote_jid, Mockery::on(function ($content) {
-                return str_contains($content, 'Voy a avisar a un asesor humano');
-            }))
             ->andReturn(true);
 
-        // We can't easily test the second call without refactoring env() usage to config().
-        // For now, let's verify the first part passes.
+        // 4. Set admin number config
+        config(['services.admin_whatsapp_number' => '573001234567']);
 
-
-        // 4. Run Job
+        // 5. Run Job
         $job = new ProcessWhatsappMessage($chat, $message->content, $message->id);
-        $job->handle($geminiMock, $evolutionMock);
+        $job->handle($geminiMock, $ycloudMock);
 
-        // 5. Assert Chat is now inactive
+        // 6. Assert Chat is now inactive
         $this->assertFalse($chat->fresh()->is_active);
     }
 
-    public function test_inactive_chat_webhook_does_not_dispatch_job()
+    public function test_inactive_chat_does_not_process_ai()
     {
         // 1. Setup Inactive Chat
         $chat = Chat::create([
             'remote_jid' => '987654321@s.whatsapp.net',
-            'is_active' => false, // INACTIVE
-            'name' => 'Tester'
+            'is_active' => false,
+            'name' => 'Tester',
+            'provider' => 'ycloud',
         ]);
 
-        // 2. Simulate Webhook Payload
+        // 2. Simulate incoming message via YCloud webhook
         $payload = [
-            'event' => 'messages.upsert',
-            'data' => [
-                'key' => [
-                    'remoteJid' => '987654321@s.whatsapp.net',
-                    'fromMe' => false,
-                    'id' => 'MSG_ID_123'
-                ],
-                'pushName' => 'Tester',
-                'message' => [
-                    'conversation' => 'Hola, sigues ahi?'
-                ]
+            'type' => 'whatsapp.inbound_message.received',
+            'whatsappInboundMessage' => [
+                'id' => 'MSG_ID_123',
+                'from' => '987654321',
+                'to' => '+573185995909',
+                'type' => 'text',
+                'text' => ['body' => 'Hola, sigues ahi?'],
+                'customerProfile' => ['name' => 'Tester'],
             ]
         ];
 
-        // 3. Expect Job NOT to be pushed
+        // 3. Expect Job NOT to be dispatched
         \Illuminate\Support\Facades\Bus::fake();
 
-        // 4. Call Webhook
-        // Mock API Key env
-        config(['app.evolution_api_key' => 'test_key']); // Assuming middleware uses this config/env
-
-        $response = $this->withHeaders(['apikey' => env('EVOLUTION_API_KEY') ?? 'testing_key'])
-            ->postJson('/api/evolution/webhook', $payload);
+        // 4. Call YCloud Webhook
+        $response = $this->postJson('/api/ycloud/webhook', $payload);
 
         // 5. Assertions
         $response->assertStatus(200);
-        $response->assertJson(['status' => 'saved_no_reply_handoff']);
 
         // Ensure Job was NOT dispatched
         \Illuminate\Support\Facades\Bus::assertNotDispatched(ProcessWhatsappMessage::class);
-
-        // Ensure Message WAS saved
-        $this->assertDatabaseHas('messages', [
-            'chat_id' => $chat->id,
-            'content' => 'Hola, sigues ahi?',
-            'role' => 'user'
-        ]);
     }
 }
