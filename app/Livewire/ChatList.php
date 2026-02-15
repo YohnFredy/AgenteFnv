@@ -11,6 +11,7 @@ class ChatList extends Component
     use WithPagination;
 
     public $search = '';
+    // Propiedades para edición
     public $sortField = 'updated_at';
     public $sortDirection = 'desc';
 
@@ -19,11 +20,34 @@ class ChatList extends Component
     public $editingName = '';
     public $editingStage = '';
 
+    public $selectedChatId = null;
+    public $selectedChat = null;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'sortField' => ['except' => 'updated_at'],
         'sortDirection' => ['except' => 'desc'],
+        'selectedChatId' => ['except' => null],
     ];
+
+    public function mount()
+    {
+        if ($this->selectedChatId) {
+            $this->selectedChat = Chat::find($this->selectedChatId);
+        }
+    }
+
+    public function selectChat($chatId)
+    {
+        $this->selectedChatId = $chatId;
+        $this->selectedChat = Chat::find($chatId);
+    }
+
+    public function resetSelection()
+    {
+        $this->selectedChatId = null;
+        $this->selectedChat = null;
+    }
 
     public function updatedSearch()
     {
@@ -91,7 +115,7 @@ class ChatList extends Component
                     ->orWhere('chats.remote_jid', 'like', '%' . $this->search . '%');
             })
             ->orderBy($this->sortField === 'updated_at' ? 'last_activity' : 'chats.' . $this->sortField, $this->sortDirection)
-            ->paginate(10);
+            ->simplePaginate(10);
 
         return view('livewire.chat-list', [
             'chats' => $chats

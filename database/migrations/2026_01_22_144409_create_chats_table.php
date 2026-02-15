@@ -14,9 +14,12 @@ return new class extends Migration
         Schema::create('chats', function (Blueprint $table) {
             $table->id();
             $table->string('remote_jid')->unique(); // El ID de WhatsApp (57300...@s.whatsapp.net)
+            $table->string('provider')->default('evolution');
             $table->string('name')->nullable();     // El nombre (PushName)
             $table->tinyInteger('stage')->unsigned()->default(0)->index();
             $table->string('status')->default('open'); // Por si quieres cerrar tickets luego
+            $table->text('system_instruction')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

@@ -247,7 +247,7 @@ class ProcessWhatsappMessage implements ShouldQueue
             $fullUserMessage = $recentUserMessages
                 ->pluck('content')
                 ->filter(function ($content) {
-                    return !in_array($content, ['[Image Message]', '[Audio Message]', '[Unsupported Message]', '[Empty Text Message]']);
+                    return !in_array($content, ['[Image Message]', '[Audio Message]', '[Unsupported Message]', '[Empty Text Message]', '[Mensaje no disponible - Error 131060]']);
                 })
                 ->implode(' ');
 
@@ -264,7 +264,7 @@ class ProcessWhatsappMessage implements ShouldQueue
                     $triggerMediaType = $triggerMessage ? $triggerMessage->media_type : null;
 
                     // Solo enviamos mensaje de cortesía si hay un tipo de medio específico que no soportamos
-                    if ($triggerMediaType && !in_array($triggerMediaType, ['text', 'image', 'audio', null])) {
+                    if ($triggerMediaType && !in_array($triggerMediaType, ['text', 'image', 'audio', null, 'unsupported_content'])) {
                         Log::info("Mensaje no soportado detectado (tipo: {$triggerMediaType}) sin contexto adicional. Enviando respuesta de cortesía.");
 
                         $politeMessage = "👋 Hola. He recibido tu archivo, pero por el momento mi sistema solo está optimizado para analizar **Texto, Audios e Imágenes**.\n\n¿Podrías por favor escribirme tu consulta o enviármela en una nota de voz? Estaré encantado de ayudarte. 😊";
@@ -285,7 +285,7 @@ class ProcessWhatsappMessage implements ShouldQueue
                     }
                 }
 
-                if (!in_array($fallback, ['[Image Message]', '[Audio Message]', '[Unsupported Message]', '[Empty Text Message]'])) {
+                if (!in_array($fallback, ['[Image Message]', '[Audio Message]', '[Unsupported Message]', '[Empty Text Message]', '[Mensaje no disponible - Error 131060]'])) {
                     $fullUserMessage = $fallback;
                 }
             }
@@ -394,8 +394,8 @@ class ProcessWhatsappMessage implements ShouldQueue
                 // Construir contexto de historial para incluir en el prompt de visión
                 $historyContext = "";
                 foreach ($history as $msg) {
-                    // Excluir el mensaje actual de imagen del historial
-                    if ($msg['content'] !== '[Image Message]') {
+                    // Excluir el mensaje actual de imagen del historial y mensajes de error internos
+                    if ($msg['content'] !== '[Image Message]' && $msg['content'] !== '[Mensaje no disponible - Error 131060]') {
                         $role = $msg['role'] === 'user' ? 'Usuario' : 'Asistente';
                         $historyContext .= "{$role}: {$msg['content']}\n";
                     }
@@ -425,6 +425,10 @@ class ProcessWhatsappMessage implements ShouldQueue
                 $fullPrompt = "Instrucción del Sistema: " . $systemInstruction . "\n\n";
                 $fullPrompt .= "Historial de conversación (incluye último mensaje del usuario):\n";
                 foreach ($history as $msg) {
+                    // Filtrar mensajes internos que no aportan valor a la conversación
+                    if ($msg['content'] === '[Mensaje no disponible - Error 131060]') {
+                        continue;
+                    }
                     $role = $msg['role'] === 'user' ? 'Usuario' : 'Asistente';
                     $fullPrompt .= "{$role}: {$msg['content']}\n";
                 }

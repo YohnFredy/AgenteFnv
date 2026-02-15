@@ -199,8 +199,20 @@ class YCloudWebhookController extends Controller
                 'messageData' => $messageData
             ]);
 
-            $text = '[Unsupported Message]';
-            $mediaType = $messageType; // Guardamos el tipo real para referencia
+            // [MODIFICADO] Verificar error 131060 (Mensaje no disponible / Posible Click-to-WhatsApp)
+            // Cuando un usuario hace clic en un anuncio y envía el mensaje por defecto, a veces YCloud/Meta
+            // no entrega el contenido y devuelve type="unsupported" con error 131060.
+            // En este caso, NO queremos enviar el mensaje de error "formato no soportado".
+            $errorCode = $messageData['errors'][0]['code'] ?? null;
+
+            if ($messageType === 'unsupported' && $errorCode === '131060') {
+                $text = '[Mensaje no disponible - Error 131060]';
+                $mediaType = 'unsupported_content'; // Tipo especial para evitar mensaje de error al usuario
+                Log::info("Detectado error 131060 (Message Unavailable). Tratando como contenido oculto/anuncio para evitar error de formato.");
+            } else {
+                $text = '[Unsupported Message]';
+                $mediaType = $messageType; // Guardamos el tipo real para referencia
+            }
         }
 
         // if (!$text && !$mediaUrl) ... // Ya no bloqueamos aquí porque $text tendrá valor

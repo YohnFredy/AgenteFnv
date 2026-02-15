@@ -18,8 +18,10 @@ return new class extends Migration
             // 'user' = lo que escribe el cliente
             // 'assistant' = lo que responde tu IA
             $table->enum('role', ['user', 'assistant', 'system']);
-
             $table->text('content'); // El texto del mensaje
+            $table->text('media_url')->nullable();
+            $table->string('media_type')->nullable();
+            $table->string('media_path')->nullable();
             $table->string('whatsapp_id')->nullable(); // ID único del mensaje en WA
             $table->timestamps();
         });
