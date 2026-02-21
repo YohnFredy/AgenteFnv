@@ -114,9 +114,51 @@ class YCloudService
     /**
      * Envía plantilla (opcional, por si se necesita más adelante).
      */
-    public function sendTemplate(string $remoteJid, string $templateName, string $language = 'en'): bool
+    /**
+     * Envía plantilla
+     */
+    public function sendTemplate(string $remoteJid, string $templateName, string $language = 'es'): bool
     {
-        // Implementation for templates if needed
-        return false;
+        $apiKey = config('services.ycloud.api_key');
+        $fromNumber = config('services.ycloud.from_number');
+
+        // YCloud expects the 'to' number in E.164 format (e.g. +1234567890)
+        $to = str_replace('@s.whatsapp.net', '', $remoteJid);
+        if (!str_starts_with($to, '+')) {
+            $to = '+' . $to;
+        }
+
+        $url = 'https://api.ycloud.com/v2/whatsapp/messages';
+
+        try {
+            $response = Http::timeout(30)
+                ->withHeaders([
+                    'X-API-Key' => $apiKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post($url, [
+                    'from' => $fromNumber,
+                    'to' => $to,
+                    'type' => 'template',
+                    'template' => [
+                        'name' => $templateName,
+                        'language' => [
+                            'code' => 'es_CO', // Changed from 'es' to 'es_CO' to match Spanish (COL)
+                            'policy' => 'deterministic'
+                        ],
+                        // 'components' => [] // Add components if variables are needed
+                    ]
+                ]);
+
+            if ($response->failed()) {
+                Log::error('Error enviando plantilla a YCloud: ' . $response->body());
+                return false;
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Excepción YCloud Template: ' . $e->getMessage());
+            return false;
+        }
     }
 }

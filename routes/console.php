@@ -22,3 +22,8 @@ Schedule::command('queue:work --stop-when-empty --timeout=200 --tries=2')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();
+
+Schedule::command('followups:process')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();

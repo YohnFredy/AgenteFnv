@@ -46,25 +46,47 @@
 </head>
 
 <body class="min-h-screen bg-white dark:bg-zinc-800">
-    <flux:sidebar sticky collapsible="mobile" class="sidebar-compact border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
+    <flux:sidebar sticky collapsible="mobile"
+        class="sidebar-compact border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
         <flux:sidebar.header>
-            <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+            <x-app-logo :sidebar="true" href="{{ route('chat.list') }}" wire:navigate />
             <flux:sidebar.collapse class="lg:hidden" />
         </flux:sidebar.header>
 
         <flux:sidebar.nav>
             <flux:sidebar.group class="grid">
-                <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
+                {{-- <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')"
+                    wire:navigate>
                     <span class="nav-text">{{ __('Dashboard') }}</span>
+                </flux:sidebar.item> --}}
+                <flux:sidebar.item icon="user-group" :href="route('chat.list')"
+                    :current="request()->routeIs('chat.list')" wire:navigate>
+                    <span class="nav-text">{{ __('Monitor de Chats') }}</span>
                 </flux:sidebar.item>
-                <flux:sidebar.item icon="cpu-chip" :href="route('bot.settings')" :current="request()->routeIs('bot.settings')" wire:navigate>
+                <flux:sidebar.item icon="cpu-chip" :href="route('bot.settings')"
+                    :current="request()->routeIs('bot.settings')" wire:navigate>
                     <span class="nav-text">{{ __('Configuración Bot') }}</span>
                 </flux:sidebar.item>
-                <flux:sidebar.item icon="chat-bubble-left-right" :href="route('bot.rules')" :current="request()->routeIs('bot.rules')" wire:navigate>
+                <flux:sidebar.item icon="chat-bubble-left-right" :href="route('bot.rules')"
+                    :current="request()->routeIs('bot.rules')" wire:navigate>
                     <span class="nav-text">{{ __('Reglas de Respuesta') }}</span>
                 </flux:sidebar.item>
-                <flux:sidebar.item icon="user-group" :href="route('chat.list')" :current="request()->routeIs('chat.list')" wire:navigate>
-                    <span class="nav-text">{{ __('Monitor de Chats') }}</span>
+
+                <flux:sidebar.item icon="bolt" :href="route('automation.rules')"
+                    :current="request()->routeIs('automation.rules')" wire:navigate>
+                    <span class="nav-text">{{ __('Automatización') }}</span>
+                </flux:sidebar.item>
+                <flux:sidebar.item icon="clock" :href="route('contact.followups')"
+                    :current="request()->routeIs('contact.followups')" wire:navigate>
+                    <span class="nav-text">{{ __('Seguimientos Activos') }}</span>
+                </flux:sidebar.item>
+                <flux:sidebar.item icon="megaphone" :href="route('followup.campaigns')"
+                    :current="request()->routeIs('followup.campaigns')" wire:navigate>
+                    <span class="nav-text">{{ __('Campañas Seguimiento') }}</span>
+                </flux:sidebar.item>
+                <flux:sidebar.item icon="paper-airplane" :href="route('marketing')"
+                    :current="request()->routeIs('marketing')" wire:navigate>
+                    <span class="nav-text">{{ __('Marketing') }}</span>
                 </flux:sidebar.item>
             </flux:sidebar.group>
         </flux:sidebar.nav>
@@ -72,11 +94,13 @@
         <flux:spacer />
 
         <flux:sidebar.nav>
-            <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
+            <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit"
+                target="_blank">
                 <span class="nav-text">{{ __('Repository') }}</span>
             </flux:sidebar.item>
 
-            <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
+            <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire"
+                target="_blank">
                 <span class="nav-text">{{ __('Documentation') }}</span>
             </flux:sidebar.item>
         </flux:sidebar.nav>
@@ -105,11 +129,13 @@
                     </div>
                 </flux:menu.radio.group>
                 <flux:menu.separator />
-                <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>{{ __('Settings') }}</flux:menu.item>
+                <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>{{ __('Settings') }}
+                </flux:menu.item>
                 <flux:menu.separator />
                 <form method="POST" action="{{ route('logout') }}" class="w-full">
                     @csrf
-                    <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full cursor-pointer">
+                    <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle"
+                        class="w-full cursor-pointer">
                         {{ __('Log Out') }}
                     </flux:menu.item>
                 </form>

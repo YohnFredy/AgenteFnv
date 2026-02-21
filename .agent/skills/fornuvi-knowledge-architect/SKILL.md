@@ -58,8 +58,14 @@ Cuando el administrador ingrese nueva información, sigue estos pasos:
 - **Identificación de Repeticiones**: Si el concepto ya existe, decide si la nueva entrada lo *enriquece* o lo *reemplaza*.
 - **Detección de Conflictos**: Si una regla nueva dice "A" y la anterior decía "B", aplica el **Protocolo de Prioridad Temporal** (la más reciente domina).
 
-### 2️⃣ Fase de Refinería (Optimización)
-- **Cero Redundancia**: Si el texto dice lo mismo tres veces con palabras distintas, fúndelo en una sola frase potente.
+### 2️⃣ Fase de Conversión Activa (NUEVO - CRÍTICO)
+- **Prohibición de Pasividad**: Elimina frases como *"Tómate tu tiempo"*, *"Si quieres"*, *"Cuando puedas"*. El bot LIDERA, no sugiere.
+- **Cerrojo de Compromiso**: No entregues el siguiente recurso (Video 2, Enlace) sin un micro-compromiso del usuario (ej: "Escribe 'YA LO VI' para continuar").
+- **Pregunta Gancho**: Termina siempre con una pregunta cerrada o de opción múltiple, nunca abierta o pasiva.
+
+### 3️⃣ Fase de Refinería (Optimización)
+- **Cero Redundancia (Auditoría de Tokens)**: Revisa si una regla ya está implícita en otra sección. Si `business_logic` ya define un concepto (ej: "Tipos de Comercio"), `faq_optimized` **NO** debe repetirlo.
+- **Referencias Cruzadas**: En lugar de repetir texto, usa punteros para ahorrar cómputo (ej: "(Ver definición oficial en `<business_logic>`)").
 - **Voz Humana y Comercial**: NO te vuelvas robótico. Si el administrador usa una frase ganadora como *"Transforma tus gastos en tu mayor inversión"*, esa frase debe permanecer intacta.
 - **Claridad Estructural**: Usa listas, negritas y jerarquías que la IA de LLM reconozca fácilmente.
 
@@ -75,22 +81,32 @@ Cuando el administrador ingrese nueva información, sigue estos pasos:
 - **Preservación de la Esencia**: Si el administrador es informal o emocional, destila esa emoción en la instrucción para que la IA también la transmita.
 - **Eliminación de Basura**: Datos como "mi tía dijo que" o muletillas de texto deben ser eliminados sin preguntar.
 - **Consistencia Legal**: NIT, dirección y horarios deben ser datos estáticos y sagrados.
+- **Regla Dato por Dato (Cero Fricción)**: Si el usuario pregunta un dato específico (Precio, Fecha, Lugar), **DA EL DATO PRIMERO**. No respondas con un video genérico. El video es un *complemento* posterior, no una barrera.
 
 ---
-## 🛡️ PROTOCOLO DE SEGURIDAD (Prevención de Regresiones)
+## 🛡️ PROTOCOLO DE SEGURIDAD (Prevención de Regresiones - CRÍTICO)
 
-Para evitar borrar personalizaciones del administrador, CUALQUIER agente que modifique el conocimiento DEBE seguir este protocolo:
+Para evitar borrar personalizaciones del administrador, CUALQUIER agente que modifique el conocimiento **DEBE** seguir este protocolo. **LA SOBRESCRITURA CIEGA ESTÁ PROHIBIDA**.
 
-### 1️⃣ Verificación de Estado Actual:
-- **ANTES** de proponer un cambio, consulta el valor actual en la base de datos:
-  `php artisan tinker --execute="echo DB::table('bot_settings')->where('key', 'system_instruction')->value('value');"`
-- Identifica personalizaciones críticas (Links de WhatsApp, flujos específicos de registro) que no deben perderse.
+### 1️⃣ Verificación de Estado Actual (OBLIGATORIO):
+- **ANTES** de proponer CUALQUIER cambio, **LEE** el valor actual en la base de datos:
+  `php artisan tinker --execute="echo App\Models\BotSetting::find('system_instruction')->value;"`
+- Copia ese contenido XML actual. Ese es tu punto de partida.
 
-### 2️⃣ Fusión Inteligente (NO Sobrescritura Ciega):
-- Si vas a usar un script de PHP para actualizar, asegúrate de que el bloque `EOT` contenga las últimas personalizaciones detectadas en el paso anterior.
-- Si el administrador pide un cambio pequeño, prefiere actualizar solo esa sección en lugar de regenerar todo el bloque si no tienes la certeza de que es la versión más reciente.
+### 2️⃣ Estrategia de Fusión (Merge & Refine):
+- **NUNCA** crees un script que reemplace todo el contenido con un texto genérico.
+- **SIEMPRE** toma el XML actual y:
+    1.  Busca la etiqueta `<tag>` específica que necesitas actualizar (ej: `<business_logic>`).
+    2.  Inserta o modifica **SOLO** la información nueva dentro de esa estructura existente.
+    3.  Mantén intactas todas las demás secciones (`<identity_and_persona>`, `<interaction_flows>`, `<operational_rules>`).
+- Si la información nueva contradice la anterior, actualízala, pero mantén el formato y el tono.
 
-### 3️⃣ Verificación Post-Actualización (Safe-Check):
+### 3️⃣ Script de Actualización Inteligente:
+- Tu script de migración o PHP debe contener **TODO** el XML completo: las partes antiguas (que leíste en el paso 1) + las partes nuevas.
+- **NO** confíes en scripts antiguos o en tu memoria. Confía solo en lo que acabas de leer de la base de datos.
+- Verifica que los "Enlaces Sagrados" (WhatsApp, Registro, Reuniones) sigan presentes en tu nueva versión del XML.
+
+### 4️⃣ Verificación Post-Actualización (Safe-Check):
 - Tras cada actualización, ejecuta una búsqueda de "Palabras Sagradas" para confirmar que siguen ahí:
   - Enlace de Registro corregido.
   - Enlace del Grupo de WhatsApp oficial.

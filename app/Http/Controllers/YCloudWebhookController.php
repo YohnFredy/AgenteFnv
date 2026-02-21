@@ -162,6 +162,13 @@ class YCloudWebhookController extends Controller
             ]
         );
 
+        if ($chat->wasRecentlyCreated) {
+            $setting = \App\Models\BotSetting::find('default_new_user_tag_id');
+            if ($setting && $setting->value) {
+                $chat->tags()->syncWithoutDetaching([$setting->value]);
+            }
+        }
+
         // Ensure provider (idempotent update)
         if ($chat->provider !== 'ycloud') {
             $chat->update(['provider' => 'ycloud']);

@@ -32,4 +32,9 @@ class Chat extends Model
             ->values()
             ->toArray();
     }
+
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class, 'lead_tag', 'chat_id', 'tag_id');
+    }
 }
