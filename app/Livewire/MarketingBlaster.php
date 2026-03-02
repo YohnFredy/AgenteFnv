@@ -19,6 +19,7 @@ class MarketingBlaster extends Component
 
     // Filters
     public $selectedTags = []; // Tags to EXCLUDE
+    public $includedTags = []; // Tags to INCLUDE
     public $timeHours = 24;
 
     // Messages
@@ -42,6 +43,11 @@ class MarketingBlaster extends Component
     }
 
     public function updatedSelectedTags()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedIncludedTags()
     {
         $this->resetPage();
     }
@@ -70,6 +76,13 @@ class MarketingBlaster extends Component
         if (!empty($this->selectedTags)) {
             $query->whereDoesntHave('tags', function ($q) {
                 $q->whereIn('tags.id', $this->selectedTags);
+            });
+        }
+
+        // Filter 1.5: Include Tags
+        if (!empty($this->includedTags)) {
+            $query->whereHas('tags', function ($q) {
+                $q->whereIn('tags.id', $this->includedTags);
             });
         }
 

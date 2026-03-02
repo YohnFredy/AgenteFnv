@@ -21,3 +21,4 @@ Route::get('/followup-campaigns', \App\Livewire\FollowupCampaigns::class)->middl
 Route::get('/automation-rules', \App\Livewire\AutomationRules::class)->middleware(['auth'])->name('automation.rules');
 Route::get('/contact-followups', \App\Livewire\ContactFollowups::class)->middleware(['auth'])->name('contact.followups');
 Route::get('/marketing', \App\Livewire\MarketingBlaster::class)->middleware(['auth'])->name('marketing');
+Route::get('/phone-manager', \App\Livewire\PhoneNormalizationManager::class)->middleware(['auth'])->name('phone.manager');

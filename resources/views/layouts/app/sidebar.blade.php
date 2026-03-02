@@ -88,24 +88,16 @@
                     :current="request()->routeIs('marketing')" wire:navigate>
                     <span class="nav-text">{{ __('Marketing') }}</span>
                 </flux:sidebar.item>
+                <flux:sidebar.item icon="phone" :href="route('phone.manager')"
+                    :current="request()->routeIs('phone.manager')" wire:navigate>
+                    <span class="nav-text">{{ __('Teléfonos Registrados') }}</span>
+                </flux:sidebar.item>
             </flux:sidebar.group>
         </flux:sidebar.nav>
 
         <flux:spacer />
 
-        <flux:sidebar.nav>
-            <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit"
-                target="_blank">
-                <span class="nav-text">{{ __('Repository') }}</span>
-            </flux:sidebar.item>
-
-            <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire"
-                target="_blank">
-                <span class="nav-text">{{ __('Documentation') }}</span>
-            </flux:sidebar.item>
-        </flux:sidebar.nav>
-
-        <div class="mt-auto border-t border-zinc-200 dark:border-zinc-700 p-2">
+        <div class="mt-auto dark:border-zinc-700 ">
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </div>
     </flux:sidebar>

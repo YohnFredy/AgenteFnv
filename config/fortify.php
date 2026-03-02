@@ -144,7 +144,7 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Features::registration(), // Registro deshabilitado - solo por invitación
         Features::resetPasswords(),
         Features::emailVerification(),
         // Features::updateProfileInformation(),
@@ -155,5 +155,4 @@ return [
             // 'window' => 0,
         ]),
     ],
-
 ];

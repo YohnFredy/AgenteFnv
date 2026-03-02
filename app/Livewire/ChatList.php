@@ -4,11 +4,12 @@ namespace App\Livewire;
 
 use App\Models\Chat;
 use Livewire\Component;
+use Livewire\WithoutUrlPagination;
 use Livewire\WithPagination;
 
 class ChatList extends Component
 {
-    use WithPagination;
+    use WithPagination, WithoutUrlPagination;
 
     public $search = '';
     // Propiedades para edición

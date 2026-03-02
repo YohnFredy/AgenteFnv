@@ -16,8 +16,10 @@ return new class extends Migration
             $table->string('trigger_content'); // Keyword or link
             $table->foreignId('campaign_id')->nullable()->constrained('followup_campaigns')->nullOnDelete();
             $table->foreignId('tag_id')->nullable()->constrained('tags')->nullOnDelete();
+            $table->foreignId('remove_tag_id')->nullable()->constrained('tags')->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->enum('match_type', ['contains', 'exact'])->default('contains');
+            $table->integer('followup_delay_hours')->default(0);
             $table->timestamps();
         });
     }

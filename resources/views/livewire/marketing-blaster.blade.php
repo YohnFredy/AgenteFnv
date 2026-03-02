@@ -64,14 +64,31 @@
                             min="1" />
                     </div>
 
+                    {{-- Tag Inclusion Filter --}}
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">✅ Incluir etiquetas</label>
+                        <div class="space-y-2 max-h-48 overflow-y-auto p-2 border border-zinc-200 dark:border-zinc-700 rounded-lg">
+                            @foreach($availableTags as $tag)
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" wire:model.live="includedTags" value="{{ $tag->id }}" id="include-tag-{{ $tag->id }}" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+                                <label for="include-tag-{{ $tag->id }}" class="text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full" style="background-color: {{ $tag->color ?? '#cbd5e1' }}"></span>
+                                    {{ $tag->name }}
+                                </label>
+                            </div>
+                            @endforeach
+                        </div>
+                        <p class="text-xs text-zinc-500">Dejar vacío para incluir a todos. Si seleccionas, solo se enviará a usuarios con estas etiquetas.</p>
+                    </div>
+
                     {{-- Tag Exclusion Filter --}}
                     <div class="space-y-2">
                         <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">🚫 Excluir etiquetas</label>
                         <div class="space-y-2 max-h-48 overflow-y-auto p-2 border border-zinc-200 dark:border-zinc-700 rounded-lg">
                             @foreach($availableTags as $tag)
                             <div class="flex items-center gap-2">
-                                <input type="checkbox" wire:model.live="selectedTags" value="{{ $tag->id }}" id="tag-{{ $tag->id }}" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
-                                <label for="tag-{{ $tag->id }}" class="text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer flex items-center gap-2">
+                                <input type="checkbox" wire:model.live="selectedTags" value="{{ $tag->id }}" id="exclude-tag-{{ $tag->id }}" class="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500">
+                                <label for="exclude-tag-{{ $tag->id }}" class="text-sm text-zinc-600 dark:text-zinc-400 cursor-pointer flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full" style="background-color: {{ $tag->color ?? '#cbd5e1' }}"></span>
                                     {{ $tag->name }}
                                 </label>

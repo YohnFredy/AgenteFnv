@@ -53,6 +53,35 @@
                 </div>
 
 
+                @if ($selectMode)
+                {{-- TOOLBAR DE SELECCIÓN PROFESIONAL --}}
+                <div class="flex items-center gap-3">
+                    {{-- Checkbox Seleccionar Todos --}}
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox"
+                            wire:model.live="selectAll"
+                            class="w-4 h-4 rounded border-zinc-400 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                        <span class="text-sm text-gray-600 font-medium whitespace-nowrap">
+                            {{ count($selectedChats) > 0 ? count($selectedChats) . ' seleccionados' : 'Seleccionar todos' }}
+                        </span>
+                    </label>
+
+                    @if (count($selectedChats) > 0)
+                    <button wire:click="openTagModal"
+                        class="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-full transition-colors shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+                        </svg>
+                        Etiquetar
+                    </button>
+                    @endif
+
+                    <button wire:click="toggleSelectionMode"
+                        class="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors px-1 py-1">
+                        Cancelar
+                    </button>
+                </div>
+                @else
                 <div class="flex items-center gap-4 text-gray-600">
                     <!-- Icon Add -->
                     <button class="hover:text-gray-900">
@@ -67,9 +96,7 @@
                             <flux:button variant="ghost" icon="ellipsis-vertical" title="Menú" />
                             <flux:menu>
                                 <flux:menu.item wire:click="openTagModal" icon="tag">Etiquetas</flux:menu.item>
-                                <flux:menu.item wire:click="toggleSelectionMode" icon="check-circle">
-                                    {{ $selectMode ? 'Cancelar Selección' : 'Seleccionar Chats' }}
-                                </flux:menu.item>
+                                <flux:menu.item wire:click="toggleSelectionMode" icon="check-circle">Seleccionar Chats</flux:menu.item>
                                 <flux:menu.separator />
                                 <flux:menu.item icon="cog-6-tooth">Configuración</flux:menu.item>
                                 <flux:menu.item icon="arrow-right-start-on-rectangle">Cerrar sesión</flux:menu.item>
@@ -77,6 +104,7 @@
                         </flux:dropdown>
                     </flux:tooltip>
                 </div>
+                @endif
             </div>
 
             <!-- Search -->
@@ -123,11 +151,11 @@
                         </button>
 
                         @foreach ($availableTags as $tag)
-                            <button wire:click="setFilterTag({{ $tag->id }})"
-                                class=" flex items-centercapitalize cursor-pointer capitalize ">
-                                <flux:icon.tag variant="mini" class=" mr-4" style="color: {{ $tag->color }}; " />
-                                {{ $tag->name }}
-                            </button>
+                        <button wire:click="setFilterTag({{ $tag->id }})"
+                            class=" flex items-centercapitalize cursor-pointer capitalize ">
+                            <flux:icon.tag variant="mini" class=" mr-4" style="color: {{ $tag->color }}; " />
+                            {{ $tag->name }}
+                        </button>
                         @endforeach
                     </flux:menu>
                 </flux:dropdown>
@@ -136,80 +164,94 @@
             <!-- Chat List -->
             <div class="flex-1 overflow-y-auto ">
                 @forelse($chats as $chat)
-                    <div wire:key="chat-{{ $chat->id }}"
-                        @if (!$selectMode) wire:click="selectChat({{ $chat->id }})" @endif
-                        class="flex justify-between items-center p-2.5 m-1.5 rounded-xl hover:bg-gray-100 cursor-pointer {{ $selectedChatId == $chat->id ? 'bg-zinc-200 hover:bg-zinc-300' : '' }}">
+                <div wire:key="chat-{{ $chat->id }}"
+                    wire:click="selectChat({{ $chat->id }})"
+                    class="flex justify-between items-center p-2.5 m-1.5 rounded-xl hover:bg-gray-100 cursor-pointer transition-colors
+                            {{ $selectMode && in_array((string)$chat->id, array_map('strval', $selectedChats)) ? 'bg-emerald-50 ring-1 ring-emerald-300' : ($selectedChatId == $chat->id ? 'bg-zinc-200 hover:bg-zinc-300' : '') }}">
 
-                        <div class=" flex items-center">
-                            <!-- Selection Checkbox -->
-                            @if ($selectMode)
-                                <div class="mr-3">
-                                    <input type="checkbox" value="{{ $chat->id }}" wire:model.live="selectedChats"
-                                        class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
-                                </div>
-                            @else
-                                <div class="hidden group-hover:block absolute left-2 z-10">
-                                    <div class="bg-white dark:bg-[#202c33] rounded-full p-1 shadow">
-                                        <input type="checkbox" value="{{ $chat->id }}"
-                                            wire:click.stop="toggleSelectionMode; $set('selectedChats', ['{{ $chat->id }}'])"
-                                            class="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500">
-                                    </div>
-                                </div>
-                            @endif
-                            <div class=" flex gap-3">
-                                @if ($chat->is_active)
-                                    <div
-                                        class="w-12 h-12 rounded-full border-2 bg-gray-100 border-gray-400 flex justify-center 
-                                        items-center">
-                                        {{ strtoupper(substr($chat->name ?? '?', 0, 2)) }}
-                                    </div>
-                                @else
-                                    <div
-                                        class="w-12 h-12 rounded-full border-2 bg-gray-100 border-red-400 text-red-500 flex justify-center items-center ">
-                                        {{ strtoupper(substr($chat->name ?? '?', 0, 2)) }}
-                                    </div>
+                    <div class="flex items-center">
+                        <!-- Selection Checkbox - always shown in selectMode -->
+                        @if ($selectMode)
+                        <div class="mr-3 flex-shrink-0" wire:click.stop="selectChat({{ $chat->id }})">
+                            <div class="flex items-center justify-center w-5 h-5 rounded-full border-2 transition-all
+                                        {{ in_array((string)$chat->id, array_map('strval', $selectedChats)) ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-400 bg-white' }}">
+                                @if (in_array((string)$chat->id, array_map('strval', $selectedChats)))
+                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
                                 @endif
-
-                                <div class="">
-                                    <div class="flex justify-between items-center">
-
-                                        <div class="font-medium text-gray-900 truncate flex items-center">
-                                            <span class=" mr-5">
-                                                {{ $chat->name ?? str_replace('@s.whatsapp.net', '', $chat->remote_jid) }}</span>
-
-                                            <!-- Tags -->
-                                            @if ($chat->tags->count() > 0)
-                                                @foreach ($chat->tags as $tag)
-                                                    <flux:icon.tag variant="mini" style="color: {{ $tag->color }}; "
-                                                        class=" -ml-3" />
-                                                @endforeach
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <p class="text-sm text-gray-600 truncate">
-                                        {{ str_replace('@s.whatsapp.net', '', $chat->remote_jid) }}
-                                    </p>
-                                </div>
                             </div>
                         </div>
+                        @endif
+                        <div class=" flex gap-3">
+                            @if ($chat->is_active)
+                            <div
+                                class="w-12 h-12 rounded-full border-2 bg-gray-100 border-gray-400 flex justify-center 
+                                        items-center">
+                                {{ strtoupper(substr($chat->name ?? '?', 0, 2)) }}
+                            </div>
+                            @else
+                            <div
+                                class="w-12 h-12 rounded-full border-2 bg-gray-100 border-red-400 text-red-500 flex justify-center items-center ">
+                                {{ strtoupper(substr($chat->name ?? '?', 0, 2)) }}
+                            </div>
+                            @endif
 
-                        <div class="text-xs text-gray-500">
-                            {{ \Carbon\Carbon::parse($chat->last_activity)->format('H:i') }}
+                            <div class="">
+                                <div class="flex justify-between items-center">
+
+                                    <div class="font-medium text-gray-900 truncate flex items-center">
+                                        <span class=" mr-5">
+                                            {{ $chat->name ?? str_replace('@s.whatsapp.net', '', $chat->remote_jid) }}</span>
+
+                                        <!-- Tags -->
+                                        @if ($chat->tags->count() > 0)
+                                        @foreach ($chat->tags as $tag)
+                                        <flux:icon.tag variant="mini" style="color: {{ $tag->color }}; "
+                                            class=" -ml-3" />
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 truncate">
+                                    {{ str_replace('@s.whatsapp.net', '', $chat->remote_jid) }}
+                                </p>
+                            </div>
                         </div>
+                    </div>
 
+                    @php
+                    $lastAct = \Carbon\Carbon::parse($chat->last_activity);
+                    $today = \Carbon\Carbon::today();
+                    $yesterday = \Carbon\Carbon::yesterday();
+                    $weekAgo = \Carbon\Carbon::now()->subDays(6)->startOfDay();
+                    if ($lastAct->isSameDay($today)) {
+                    $actLabel = $lastAct->format('g:i A');
+                    } elseif ($lastAct->isSameDay($yesterday)) {
+                    $actLabel = 'Ayer';
+                    } elseif ($lastAct->greaterThanOrEqualTo($weekAgo)) {
+                    $actLabel = $lastAct->translatedFormat('l');
+                    } else {
+                    $actLabel = $lastAct->format('d/m/Y');
+                    }
+                    @endphp
+                    <div class="text-xs text-gray-500">
+                        {{ $actLabel }}
                     </div>
+
+                </div>
                 @empty
-                    <div class="p-10 text-center">
-                        <p class="text-zinc-500 dark:text-zinc-400 text-sm">No se encontraron chats.</p>
-                    </div>
+                <div class="p-10 text-center">
+                    <p class="text-zinc-500 dark:text-zinc-400 text-sm">No se encontraron chats.</p>
+                </div>
                 @endforelse
             </div>
 
             <!-- Pagination -->
             @if ($chats->hasPages())
-                <div class="p-2 border-t border-zinc-100 dark:border-zinc-800">
-                    {{ $chats->links() }}
-                </div>
+            <div class="p-2 border-t border-zinc-100 dark:border-zinc-800">
+                {{ $chats->links() }}
+            </div>
             @endif
         </div>
 
@@ -217,27 +259,27 @@
         <div
             class="flex-1 bg-zinc-50 dark:bg-[#222e35] overflow-hidden {{ $selectedChatId ? 'flex flex-col' : 'hidden md:flex' }} w-full min-w-0">
             @if ($selectedChatId && $selectedChat)
-                <livewire:chat-detail :chat="$selectedChat" :key="'chat-detail-' . $selectedChatId" />
+            <livewire:chat-detail :chat="$selectedChat" :key="'chat-detail-' . $selectedChatId" />
             @else
-                <!-- Placeholder for Detail (Desktop) -->
-                <div class="hidden md:flex flex-1 h-full items-center justify-center relative">
-                    <div class="max-w-md text-center space-y-4">
-                        <div
-                            class="inline-flex h-20 w-20 rounded-full bg-zinc-200 dark:bg-zinc-800 items-center justify-center text-zinc-400">
-                            <flux:icon.chat-bubble-left-right class="size-10" />
-                        </div>
-                        <h2 class="text-2xl font-light text-zinc-800 dark:text-zinc-300">WhatsApp Web</h2>
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Envía y recibe mensajes sin necesidad de
-                            tener tu teléfono conectado. <br> Usa WhatsApp en hasta 4 dispositivos vinculados y 1
-                            teléfono a la vez.</p>
-                        <div class="pt-10 flex items-center justify-center gap-2 text-zinc-400 text-xs">
-                            <flux:icon.lock-closed class="size-3" />
-                            Cifrado de extremo a extremo
-                        </div>
+            <!-- Placeholder for Detail (Desktop) -->
+            <div class="hidden md:flex flex-1 h-full items-center justify-center relative">
+                <div class="max-w-md text-center space-y-4">
+                    <div
+                        class="inline-flex h-20 w-20 rounded-full bg-zinc-200 dark:bg-zinc-800 items-center justify-center text-zinc-400">
+                        <flux:icon.chat-bubble-left-right class="size-10" />
                     </div>
-                    <!-- Bottom Line Decor -->
-                    <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-emerald-500"></div>
+                    <h2 class="text-2xl font-light text-zinc-800 dark:text-zinc-300">WhatsApp Web</h2>
+                    <p class="text-sm text-zinc-500 dark:text-zinc-400">Envía y recibe mensajes sin necesidad de
+                        tener tu teléfono conectado. <br> Usa WhatsApp en hasta 4 dispositivos vinculados y 1
+                        teléfono a la vez.</p>
+                    <div class="pt-10 flex items-center justify-center gap-2 text-zinc-400 text-xs">
+                        <flux:icon.lock-closed class="size-3" />
+                        Cifrado de extremo a extremo
+                    </div>
                 </div>
+                <!-- Bottom Line Decor -->
+                <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-emerald-500"></div>
+            </div>
             @endif
         </div>
 
@@ -248,9 +290,9 @@
                     <h2 class="text-lg font-bold">Gestionar Etiquetas</h2>
                     <p class="text-sm text-gray-500">
                         @if (empty($selectedChats) && !$selectedChatId)
-                            Administra tus etiquetas.
+                        Administra tus etiquetas.
                         @else
-                            Asignar etiqueta a {{ count($selectedChats) ?: 1 }} chat(s).
+                        Asignar etiqueta a {{ count($selectedChats) ?: 1 }} chat(s).
                         @endif
                     </p>
                 </div>
@@ -271,57 +313,57 @@
                 <!-- Lista de Etiquetas -->
                 <div class="space-y-2 max-h-75 overflow-y-auto">
                     @php
-                        // Determine the effective list of chat IDs to check against
-                        $targetChatIds = $selectedChats;
-                        if (empty($targetChatIds) && $selectedChatId) {
-                            $targetChatIds = [$selectedChatId];
-                        }
-                        $targetChatIdsCount = count($targetChatIds);
+                    // Determine the effective list of chat IDs to check against
+                    $targetChatIds = $selectedChats;
+                    if (empty($targetChatIds) && $selectedChatId) {
+                    $targetChatIds = [$selectedChatId];
+                    }
+                    $targetChatIdsCount = count($targetChatIds);
                     @endphp
 
                     @forelse($availableTags as $tag)
-                        @php
-                            // Check how many of the target chats have this tag
-                            $hasTagCount = 0;
-                            if ($targetChatIdsCount > 0) {
-                                $hasTagCount = \Illuminate\Support\Facades\DB::table('lead_tag')
-                                    ->whereIn('chat_id', $targetChatIds)
-                                    ->where('tag_id', $tag->id)
-                                    ->count();
-                            }
-                            $isChecked = $targetChatIdsCount > 0 && $hasTagCount === $targetChatIdsCount;
-                            $isIndeterminate = $hasTagCount > 0 && $hasTagCount < $targetChatIdsCount;
+                    @php
+                    // Check how many of the target chats have this tag
+                    $hasTagCount = 0;
+                    if ($targetChatIdsCount > 0) {
+                    $hasTagCount = \Illuminate\Support\Facades\DB::table('lead_tag')
+                    ->whereIn('chat_id', $targetChatIds)
+                    ->where('tag_id', $tag->id)
+                    ->count();
+                    }
+                    $isChecked = $targetChatIdsCount > 0 && $hasTagCount === $targetChatIdsCount;
+                    $isIndeterminate = $hasTagCount > 0 && $hasTagCount < $targetChatIdsCount;
                         @endphp
 
                         <div
-                            class="flex items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded group">
-                            <div class="flex items-center gap-3 flex-1 cursor-pointer"
-                                wire:click="toggleTag({{ $tag->id }})">
-                                <div
-                                    class="relative flex items-center justify-center w-5 h-5 border rounded {{ $isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900' }}">
-                                    @if ($isChecked)
-                                        <flux:icon.check class="size-3.5 text-white" />
-                                    @elseif($isIndeterminate)
-                                        <div class="w-2.5 h-0.5 bg-emerald-500 rounded"></div>
-                                    @endif
-                                </div>
+                        class="flex items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded group">
+                        <div class="flex items-center gap-3 flex-1 cursor-pointer"
+                            wire:click="toggleTag({{ $tag->id }})">
+                            <div
+                                class="relative flex items-center justify-center w-5 h-5 border rounded {{ $isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900' }}">
+                                @if ($isChecked)
+                                <flux:icon.check class="size-3.5 text-white" />
+                                @elseif($isIndeterminate)
+                                <div class="w-2.5 h-0.5 bg-emerald-500 rounded"></div>
+                                @endif
+                            </div>
 
-                                <span class="w-4 h-4 rounded-full"
-                                    style="background-color: {{ $tag->color }}"></span>
-                                <span
-                                    class="font-medium text-zinc-700 dark:text-zinc-300 flex-1">{{ $tag->name }}</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <flux:icon.trash class="size-4 text-zinc-400 hover:text-red-500 cursor-pointer"
-                                    wire:click="deleteTag({{ $tag->id }})"
-                                    wire:confirm="¿Eliminar esta etiqueta?" title="Eliminar" />
-                            </div>
+                            <span class="w-4 h-4 rounded-full"
+                                style="background-color: {{ $tag->color }}"></span>
+                            <span
+                                class="font-medium text-zinc-700 dark:text-zinc-300 flex-1">{{ $tag->name }}</span>
                         </div>
-                    @empty
-                        <div class="text-center text-gray-400 text-sm py-4">No tienes etiquetas creadas.</div>
-                    @endforelse
+                        <div class="flex items-center gap-2">
+                            <flux:icon.trash class="size-4 text-zinc-400 hover:text-red-500 cursor-pointer"
+                                wire:click="deleteTag({{ $tag->id }})"
+                                wire:confirm="¿Eliminar esta etiqueta?" title="Eliminar" />
+                        </div>
                 </div>
+                @empty
+                <div class="text-center text-gray-400 text-sm py-4">No tienes etiquetas creadas.</div>
+                @endforelse
             </div>
-        </flux:modal>
     </div>
+    </flux:modal>
+</div>
 </div>

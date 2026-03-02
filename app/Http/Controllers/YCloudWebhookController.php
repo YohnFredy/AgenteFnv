@@ -198,6 +198,10 @@ class YCloudWebhookController extends Controller
             $mediaType = 'audio';
             $text = '[Audio Message]';
             $mediaUrl = $messageData['audio']['link'] ?? ($messageData['audio']['id'] ?? ($messageData['voice']['link'] ?? ($messageData['voice']['id'] ?? null)));
+        } elseif ($messageType === 'reaction') {
+            $mediaType = 'text'; // Tratamos la reacción como texto para que la IA la procese naturalmente
+            $text = $messageData['reaction']['emoji'] ?? '👍';
+            Log::info("YCloud: Reacción recibida y tratada como texto: {$text}");
         } else {
             // Tipos no soportados actualmente (video, document, sticker, location, etc.)
             // Log detallado para investigar qué tipo de mensaje es

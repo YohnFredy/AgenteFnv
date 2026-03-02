@@ -19,6 +19,11 @@ return new class extends Migration
             // 'assistant' = lo que responde tu IA
             $table->enum('role', ['user', 'assistant', 'system']);
             $table->text('content'); // El texto del mensaje
+
+            $table->string('type')->nullable(); // e.g., 'text', 'template', 'image'
+            $table->string('status')->nullable(); // e.g., 'sent', 'delivered', 'read', 'failed'
+            $table->json('metadata')->nullable(); // Additional info
+
             $table->text('media_url')->nullable();
             $table->string('media_type')->nullable();
             $table->string('media_path')->nullable();
