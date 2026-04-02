@@ -365,25 +365,15 @@ class ProcessWhatsappMessage implements ShouldQueue
                 ->whereDate('created_at', now()->toDateString())
                 ->exists();
 
-            $hour = now()->hour;
-            $greetingText = ($hour < 12) ? 'Buenos días' : (($hour < 18) ? 'Buenas tardes' : 'Buenas noches');
-
-            // Si ya saludó hoy, dejamos el saludo vacío para no ser repetitivo
-            $saludo = $hasGreetedToday ? '' : $greetingText;
-
-            // Obtener instrucción global
+            // Obtener instrucción global de la Base de Datos
             $globalSetting = \App\Models\BotSetting::find('system_instruction');
-            $baseInstruction = $globalSetting ? $globalSetting->value : 'Eres un asistente útil y amable.';
+            $systemInstruction = $globalSetting ? $globalSetting->value : 'Eres un asistente útil y amable.';
 
-            // [MODIFICADO] Construir instrucción con saludo
-            if (!$hasGreetedToday) {
-                $systemInstruction = "Instrucción de Cortesía: Es la primera vez que hablas con el usuario hoy. Puedes saludarlo diciendo \"{$saludo}\" al inicio de tu mensaje SI el usuario te saludó o si es apropiado para iniciar la respuesta. Si el usuario hace una pregunta directa de qué trata el negocio, responde a la pregunta de forma natural sin ser excesivamente formal.\n" . $baseInstruction;
-            } else {
-                $systemInstruction = "Instrucción de Cortesía: Ya has saludado al usuario hoy. NO repitas saludos formales como 'Buenos días' o 'Buenas tardes'; ve directo al grano.\n" . $baseInstruction;
-            }
+            // [NUEVO] Log para depuración en producción (Verificar qué versión se está usando)
+            Log::info("Bot Instruction Loaded (DB). Length: " . strlen($systemInstruction) . " characters. Snippet: " . substr($systemInstruction, 0, 80));
 
-            // [MODIFICADO] Instrucción Handoff
-            $handoffInstruction = "\nIMPORTANTE: Si necesitas escalar a un humano (porque el usuario lo pide, hay frustración grave, o aplica alguna regla de escalamiento como registro de negocios), DEBES incluir la etiqueta [TRANSFER_TO_HUMAN] al FINAL de tu respuesta. Puedes escribir un mensaje antes de la etiqueta. La etiqueta DEBE aparecer textualmente en tu respuesta para que el sistema funcione. Ejemplo: 'Te voy a comunicar con un asesor. [TRANSFER_TO_HUMAN]'";
+            // [MODIFICADO] Instrucción Handoff (Mantener para funcionalidad de transferencia)
+            $handoffInstruction = "\n\nIMPORTANTE: Si necesitas escalar a un humano (porque el usuario lo pide, hay frustración grave, o aplica alguna regla de escalamiento como registro de negocios), DEBES incluir la etiqueta [TRANSFER_TO_HUMAN] al FINAL de tu respuesta. Puedes escribir un mensaje antes de la etiqueta. La etiqueta DEBE aparecer textualmente en tu respuesta para que el sistema funcione. Ejemplo: 'Te voy a comunicar con un asesor. [TRANSFER_TO_HUMAN]'";
             $systemInstruction .= $handoffInstruction;
 
             // 2. Consultar a Gemini (con o sin imagen)
@@ -436,6 +426,10 @@ class ProcessWhatsappMessage implements ShouldQueue
 
                 $aiResponse = $geminiService->askGemini($fullPrompt);
             }
+
+            // [SANITIZACIÓN] Forzar siempre el enlace de Meet correcto en la respuesta,
+            // sin importar lo que Gemini haya generado del historial de chats anteriores.
+            $aiResponse = $this->sanitizeMeetLinks($aiResponse);
 
             // Refresh composing después de recibir respuesta de IA
             $refreshComposing();
@@ -538,6 +532,49 @@ class ProcessWhatsappMessage implements ShouldQueue
             Log::error("Error crítico en ProcessWhatsappMessage: " . $e->getMessage());
             // Opcional: $this->release(10); // Reintentar en 10 segundos si falla
         }
+    }
+
+    /**
+     * Sanitiza los enlaces de Google Meet en la respuesta de la IA.
+     * Lee el enlace correcto desde bot_settings y reemplaza cualquier enlace antiguo,
+     * independientemente de lo que Gemini haya generado del historial de chats.
+     */
+    protected function sanitizeMeetLinks(string $response): string
+    {
+        // Solo actuar si la respuesta contiene un enlace de Meet
+        if (!str_contains($response, 'meet.google.com/')) {
+            return $response;
+        }
+
+        // Obtener el enlace correcto desde la base de datos
+        $setting = \App\Models\BotSetting::find('system_instruction');
+        if (!$setting) {
+            return $response;
+        }
+
+        // Extraer todos los enlaces de Meet de la instrucción maestra (el más frecuente es el correcto)
+        preg_match_all('/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/', $setting->value, $masterMatches);
+        
+        if (empty($masterMatches[1])) {
+            return $response;
+        }
+
+        $counts = array_count_values($masterMatches[1]);
+        arsort($counts);
+        $correctLink = array_key_first($counts);
+
+        // Reemplazar TODOS los enlaces de Meet en la respuesta por el correcto
+        $sanitized = preg_replace(
+            '/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/',
+            "meet.google.com/{$correctLink}",
+            $response
+        );
+
+        if ($sanitized !== $response) {
+            Log::info("sanitizeMeetLinks: Enlace de Meet corregido en respuesta. Correcto: meet.google.com/{$correctLink}");
+        }
+
+        return $sanitized;
     }
 
     /**

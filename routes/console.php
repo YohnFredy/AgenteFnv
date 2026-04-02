@@ -18,7 +18,7 @@ Artisan::command('inspire', function () {
 | * * * * * cd /ruta/a/tu/proyecto && php artisan schedule:run >> /dev/null 2>&1
 |
 */
-Schedule::command('queue:work --stop-when-empty --timeout=200 --tries=2')
+Schedule::command('queue:work --max-time=55 --sleep=2 --timeout=200 --tries=2')
     ->everyMinute()
     ->withoutOverlapping()
     ->runInBackground();

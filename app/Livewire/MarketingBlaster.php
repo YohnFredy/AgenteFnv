@@ -160,6 +160,13 @@ class MarketingBlaster extends Component
             }
         });
 
+        // Hybrid Approach: Asynchronously trigger the queue worker to process these marketing messages
+        try {
+            \Illuminate\Support\Facades\Http::timeout(1)->get(url('/cron.php?key=fornuvi2026cron'));
+        } catch (\Exception $e) {
+            // It's expected to timeout or fail, we just want to fire and forget
+        }
+
         $this->isSending = false;
         $this->successMessage = "🚀 Campaña iniciada. Se enviarán {$count} mensajes en cola (aprox. " . gmdate("H:i:s", $delaySeconds) . " de duración).";
 

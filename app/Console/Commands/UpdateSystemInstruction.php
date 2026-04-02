@@ -12,22 +12,28 @@ class UpdateSystemInstruction extends Command
 
     public function handle()
     {
-        $path = resource_path('docs/system_instruction_v2.md');
+        // [INVERTIDO] Ahora sincronizamos de BD a ARCHIVO para que el archivo sea un backup y no el maestro
+        $setting = BotSetting::find('system_instruction');
 
-        if (!file_exists($path)) {
-            $this->error('Archivo no encontrado: ' . $path);
+        if (!$setting) {
+            $this->error('No se encontró la instrucción en la base de datos.');
             return 1;
         }
 
-        $content = file_get_contents($path);
+        $path = resource_path('docs/system_instruction_v2.md');
+        $content = $setting->value;
 
-        BotSetting::updateOrCreate(
-            ['key' => 'system_instruction'],
-            ['value' => $content]
-        );
-
-        $this->info('✅ Instrucción del sistema actualizada correctamente.');
-        $this->info('📄 Caracteres: ' . strlen($content));
+        try {
+            if (!is_dir(dirname($path))) {
+                mkdir(dirname($path), 0755, true);
+            }
+            file_put_contents($path, $content);
+            $this->info('✅ Archivo MD de backup actualizado desde la Base de Datos.');
+            $this->info('📄 Caracteres: ' . strlen($content));
+        } catch (\Exception $e) {
+            $this->error('❌ Error al escribir el archivo: ' . $e->getMessage());
+            return 1;
+        }
 
         return 0;
     }

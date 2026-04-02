@@ -33,15 +33,18 @@ class YCloudWebhookController extends Controller
 
         // 2. Message Processing (POST)
 
+        // [MODIFICACIÓN] Soporte para bypass de ModSecurity vía Cloudflare Worker
+        // Recibimos el body crudo (JSON) que Cloudflare disfraza como "text/plain"
+        $rawContent = $request->getContent();
+
         // 2a. VALIDACIÓN DE FIRMA (Seguridad - Previene webhooks falsificados)
         // YCloud firma cada payload con tu Secret y lo envía en el header X-Ycloud-Signature
         $signature = $request->header('X-Ycloud-Signature');
         $webhookSecret = config('services.ycloud.webhook_secret');
 
         // Solo validar si el secret está configurado (opcional en desarrollo)
-        if ($webhookSecret && $signature) {
-            $payload = $request->getContent();
-            $expected = hash_hmac('sha256', $payload, $webhookSecret);
+        if ($webhookSecret && $signature && !empty($rawContent)) {
+            $expected = hash_hmac('sha256', $rawContent, $webhookSecret);
 
             if (!hash_equals($expected, $signature)) {
                 Log::warning("YCloud Webhook: Firma inválida. Posible intento de spoofing.");
@@ -50,7 +53,13 @@ class YCloudWebhookController extends Controller
             Log::debug("YCloud Webhook: Firma verificada correctamente.");
         }
 
-        $payload = $request->all();
+        // Decodificar el JSON manualmente
+        $payload = json_decode($rawContent, true);
+        
+        // Si no se puede decodificar, tratar como si fuera peticion de Laravel estandar
+        if (!$payload) {
+            $payload = $request->all();
+        }
 
         // 2b. MENSAJE ECHO (Respuestas enviadas desde el celular del negocio)
         // Estos mensajes los envía el humano desde WhatsApp, queremos guardarlos pero NO responder
@@ -281,6 +290,15 @@ class YCloudWebhookController extends Controller
 
         ProcessWhatsappMessage::dispatch($chat, $text, $newMessage->id)
             ->delay(now()->addSeconds($randomDelay));
+
+        // Hybrid Approach: Asynchronously trigger the queue worker to process this message
+        // without waiting for the server's scheduled cron job
+        try {
+            $host = request()->getSchemeAndHttpHost();
+            \Illuminate\Support\Facades\Http::timeout(1)->get($host . '/cron.php?key=fornuvi2026cron');
+        } catch (\Exception $e) {
+            // It's expected to timeout or fail, we just want to fire and forget
+        }
 
         return response()->json(['status' => 'processed']);
     }

@@ -31,7 +31,22 @@
             </p>
         </div>
 
+        <div class="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg text-sm">
+            <strong>💡 ¿Cambiaste el enlace de Google Meet?</strong> Usa <em>"Sincronizar Enlace Meet"</em> para aplicar el nuevo enlace a <strong>todas</strong> las secciones de la instrucción automáticamente y guardar en la base de datos.
+        </div>
+
         <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t dark:border-zinc-700">
+            <button
+                wire:click="fixOldLinks"
+                wire:loading.attr="disabled"
+                class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 bg-amber-500 border border-transparent rounded-xl font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-600 focus:bg-amber-600 active:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transition ease-in-out duration-150 shadow-sm disabled:opacity-50">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                <span wire:loading.remove wire:target="fixOldLinks">Sincronizar Enlace Meet</span>
+                <span wire:loading wire:target="fixOldLinks">Sincronizando...</span>
+            </button>
+
             <button
                 wire:click="save"
                 class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 bg-indigo-600 border border-transparent rounded-xl font-semibold text-sm text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150 shadow-sm active:scale-95">
